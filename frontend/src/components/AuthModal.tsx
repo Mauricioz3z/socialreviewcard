@@ -26,7 +26,7 @@ export function AuthModal({
 
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) {
-      setError('Google sign-in não está configurado (defina VITE_GOOGLE_CLIENT_ID).');
+      setError("Google sign-in isn't configured (set VITE_GOOGLE_CLIENT_ID).");
       return;
     }
 
@@ -42,7 +42,7 @@ export function AuthModal({
         if (!cancelled) onAuthed(session);
       } catch (err) {
         if (!cancelled)
-          setError(err instanceof ApiError ? 'Não foi possível entrar. Tente novamente.' : 'Erro inesperado.');
+          setError(err instanceof ApiError ? 'Could not sign you in. Please try again.' : 'Unexpected error.');
       } finally {
         if (!cancelled) setBusy(false);
       }
@@ -90,8 +90,8 @@ export function AuthModal({
               <Quote size={15} strokeWidth={2.2} />
             </span>
             <div>
-              <div className="font-bold text-[15px] tracking-tight leading-none">Entrar no ReviewCraft</div>
-              <div className="text-[12px] text-zinc-400 mt-1">Salve seus cards e gere imagens</div>
+              <div className="font-bold text-[15px] tracking-tight leading-none">Sign in to ReviewCraft</div>
+              <div className="text-[12px] text-zinc-400 mt-1">Save your cards and export images</div>
             </div>
           </div>
           <button onClick={onClose} className="text-zinc-300 hover:text-zinc-500 transition">
@@ -101,8 +101,8 @@ export function AuthModal({
 
         <div className="px-5 py-7 flex flex-col items-center">
           <p className="text-[13px] text-zinc-500 text-center mb-5 max-w-[280px]">
-            Use sua conta Google para começar. Você ganha{' '}
-            <span className="font-semibold text-zinc-700">3 exports grátis</span>.
+            Use your Google account to get started. You get{' '}
+            <span className="font-semibold text-zinc-700">3 free exports</span>.
           </p>
 
           {/* Google renders its official button into this node. */}
@@ -117,7 +117,7 @@ export function AuthModal({
           )}
 
           <p className="mt-6 text-[11px] text-zinc-400 text-center max-w-[280px]">
-            Ao continuar você concorda com os Termos e a Política de Privacidade.
+            By continuing you agree to the Terms and Privacy Policy.
           </p>
         </div>
       </div>

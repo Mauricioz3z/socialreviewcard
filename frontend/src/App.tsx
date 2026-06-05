@@ -87,6 +87,7 @@ export default function App() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [upgrading, setUpgrading] = useState(false);
+  const [showUpgrade, setShowUpgrade] = useState(false);
   const [usage, setUsage] = useState<UsageInfo | null>(null);
 
   const captureRef = useRef<HTMLDivElement>(null);
@@ -126,7 +127,7 @@ export default function App() {
       }
       if (cancelled) return;
       if (pro) {
-        showToast('Assinatura ativa', 'Bem-vindo ao ReviewCraft Pro — exports ilimitados.');
+        showToast('Subscription active', 'Welcome to ReviewCraft Pro — unlimited exports.');
       } else if (tries < 6) {
         setTimeout(poll, 1500);
       }
@@ -280,7 +281,12 @@ export default function App() {
     if (exporting) return;
     if (!session) {
       setShowAuth(true);
-      showToast('Entre para exportar', 'Use sua conta Google — você tem 3 exports grátis.', 'error');
+      showToast('Sign in to export', 'Use your Google account — you get 3 free exports.', 'error');
+      return;
+    }
+    // Already known to be out of free exports — go straight to the upgrade popup.
+    if (usage && !usage.isPro && usage.remaining !== null && usage.remaining <= 0) {
+      setShowUpgrade(true);
       return;
     }
     setExporting(true);
@@ -289,11 +295,8 @@ export default function App() {
       const { ok, usage: u } = await withAuth(claimExport);
       setUsage(u);
       if (!ok) {
-        showToast(
-          'Limite gratuito atingido',
-          `Você usou seus ${u.freeLimit} exports grátis. Assine o Pro para continuar.`,
-          'error',
-        );
+        // No free exports left — open the upgrade popup instead of just a toast.
+        setShowUpgrade(true);
         return;
       }
 
@@ -325,14 +328,14 @@ export default function App() {
       link.download = `reviewcraft-${safeName || 'card'}-${RATIOS[ratio].dims.replace(':', 'x')}.png`;
       link.href = dataUrl;
       link.click();
-      const left = u.isPro ? 'Exports ilimitados' : `${u.remaining} export(s) grátis restantes`;
-      showToast(`Imagem ${RATIOS[ratio].label} exportada`, `Salva nos downloads · ${left}`);
+      const left = u.isPro ? 'Unlimited exports' : `${u.remaining} free export(s) left`;
+      showToast(`${RATIOS[ratio].label} image exported`, `Saved to downloads · ${left}`);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         setShowAuth(true);
-        showToast('Sessão expirada', 'Entre novamente para exportar.', 'error');
+        showToast('Session expired', 'Sign in again to export.', 'error');
       } else {
-        showToast('Export falhou', 'Não foi possível gerar a imagem. Tente de novo.', 'error');
+        showToast('Export failed', 'We could not generate the image. Try again.', 'error');
       }
     } finally {
       setExporting(false);
@@ -604,18 +607,18 @@ export default function App() {
           </button>
           <div className="text-center text-[11px] text-zinc-400">
             {!session ? (
-              <>Entre com Google para exportar · {RATIOS[ratio].w}×{RATIOS[ratio].h}</>
+              <>Sign in with Google to export · {RATIOS[ratio].w}×{RATIOS[ratio].h}</>
             ) : usage?.isPro ? (
-              <span className="text-accent font-medium">Exports ilimitados · Pro</span>
+              <span className="text-accent font-medium">Unlimited exports · Pro</span>
             ) : usage ? (
               <>
                 <span className={usage.remaining === 0 ? 'text-red-500 font-semibold' : 'font-medium text-zinc-500'}>
-                  {usage.remaining} de {usage.freeLimit} exports grátis
+                  {usage.remaining} of {usage.freeLimit} free exports
                 </span>{' '}
                 · {RATIOS[ratio].w}×{RATIOS[ratio].h}
               </>
             ) : (
-              <>PNG de alta resolução · {RATIOS[ratio].w}×{RATIOS[ratio].h}</>
+              <>High-resolution PNG · {RATIOS[ratio].w}×{RATIOS[ratio].h}</>
             )}
           </div>
         </div>
@@ -686,6 +689,15 @@ export default function App() {
         />
       )}
 
+      {/* ============ UPGRADE MODAL ============ */}
+      {showUpgrade && (
+        <UpgradeModal
+          onClose={() => setShowUpgrade(false)}
+          onUpgrade={onUpgrade}
+          upgrading={upgrading}
+        />
+      )}
+
       {/* ============ AUTH MODAL ============ */}
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} onAuthed={onAuthed} />}
 
@@ -737,6 +749,80 @@ function StarGlyph({ lit }: { lit: boolean }) {
     >
       <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
     </svg>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Upgrade modal (shown when free exports run out)                   */
+/* ------------------------------------------------------------------ */
+function UpgradeModal({
+  onClose,
+  onUpgrade,
+  upgrading,
+}: {
+  onClose: () => void;
+  onUpgrade: () => void;
+  upgrading: boolean;
+}) {
+  const perks = [
+    'Unlimited high-resolution exports',
+    'No watermark on your cards',
+    'Every premium template & background',
+  ];
+  return (
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="w-full max-w-[400px] bg-white rounded-2xl shadow-2xl ring-1 ring-black/5 overflow-hidden font-ui">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-100">
+          <div className="flex items-center gap-2.5">
+            <span className="grid place-items-center w-8 h-8 rounded-lg bg-amber-400 text-white">
+              <Crown size={15} strokeWidth={2.2} />
+            </span>
+            <div>
+              <div className="font-bold text-[15px] tracking-tight leading-none">
+                You're out of free exports
+              </div>
+              <div className="text-[12px] text-zinc-400 mt-1">
+                Upgrade to ReviewCraft Pro to keep exporting
+              </div>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-zinc-300 hover:text-zinc-500 transition">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="px-5 py-6">
+          <ul className="space-y-2.5 mb-6">
+            {perks.map((f) => (
+              <li key={f} className="flex items-center gap-2.5 text-[13px] text-zinc-700">
+                <span className="grid place-items-center w-5 h-5 rounded-full bg-emerald-50 text-emerald-600 shrink-0">
+                  <Check size={13} strokeWidth={3} />
+                </span>
+                {f}
+              </li>
+            ))}
+          </ul>
+          <button
+            onClick={onUpgrade}
+            disabled={upgrading}
+            className="w-full flex items-center justify-center gap-2 h-12 rounded-xl bg-zinc-900 text-white text-[14.5px] font-semibold transition-all hover:bg-zinc-800 active:scale-[0.99] disabled:opacity-70"
+          >
+            {upgrading ? (
+              <Loader2 size={18} className="animate-spin" />
+            ) : (
+              <Crown size={18} strokeWidth={2.2} />
+            )}
+            Upgrade to Pro · $1.99/mo
+          </button>
+          <button
+            onClick={onClose}
+            className="w-full mt-2 h-10 text-[13px] text-zinc-400 hover:text-zinc-600 transition"
+          >
+            Maybe later
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
