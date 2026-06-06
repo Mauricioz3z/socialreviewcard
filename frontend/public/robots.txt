@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /chuchubeleza
+Disallow: /api/
+
+Sitemap: https://socialreviewcard.com/sitemap.xml
