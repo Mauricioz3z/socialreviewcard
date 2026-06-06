@@ -2,13 +2,19 @@ export type RatioId = 'story' | 'square';
 export type CardStyleId = 'glass' | 'minimal' | 'dark' | 'brutal';
 export type FontId = 'serif' | 'sans';
 export type AvatarMode = 'initials' | 'icon';
-export type PlatformKey = 'Etsy' | 'Shopify' | 'Amazon' | 'Instagram' | 'Custom';
+/** A selectable review source. `platform` on a card is its label (free-form). */
+export interface PlatformDisplay {
+  label: string;
+  color: string;
+  icon: string; // FontAwesome token, e.g. "fab:instagram"
+}
 
 /** The full set of values that define a card — review content + styling. */
 export interface CardData {
   review: string;
   name: string;
-  platform: PlatformKey;
+  /** Platform label — a configured platform or a free-text custom source. */
+  platform: string;
   rating: number;
   avatar: AvatarMode;
   cardStyle: CardStyleId;

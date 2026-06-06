@@ -129,6 +129,17 @@ export interface FeedbackList {
   items: FeedbackItem[];
 }
 
+export interface AdminPlatform {
+  id: number;
+  label: string;
+  color: string;
+  icon: string;
+  sortOrder: number;
+  enabled: boolean;
+}
+
+export type PlatformUpsert = Omit<AdminPlatform, 'id'>;
+
 /* ----------------------------- Auth ----------------------------- */
 
 interface TokenResponse {
@@ -196,3 +207,15 @@ export const adminMarkFeedback = (token: string, id: string, handled: boolean) =
     method: 'PATCH',
     body: JSON.stringify({ handled }),
   });
+
+export const adminListPlatforms = (token: string) =>
+  adminRequest<AdminPlatform[]>('/api/admin/platforms', token);
+
+export const adminCreatePlatform = (token: string, body: PlatformUpsert) =>
+  adminRequest<AdminPlatform>('/api/admin/platforms', token, { method: 'POST', body: JSON.stringify(body) });
+
+export const adminUpdatePlatform = (token: string, id: number, body: PlatformUpsert) =>
+  adminRequest<AdminPlatform>(`/api/admin/platforms/${id}`, token, { method: 'PUT', body: JSON.stringify(body) });
+
+export const adminDeletePlatform = (token: string, id: number) =>
+  adminRequest<void>(`/api/admin/platforms/${id}`, token, { method: 'DELETE' });

@@ -1,12 +1,14 @@
 import { forwardRef, useLayoutEffect, useRef, useState } from 'react';
 import { ReviewCard } from './ReviewCard';
 import { NOISE, RATIOS, type BackgroundConfig } from '../lib/config';
-import type { CardData } from '../types';
+import type { CardData, PlatformDisplay } from '../types';
 
 interface CanvasProps {
   data: CardData;
   bg: BackgroundConfig;
   grain: boolean;
+  /** Resolved display config for the card's platform. */
+  platform: PlatformDisplay;
   /** When set, stamps a repeating diagonal watermark (free plan). */
   watermark?: string | null;
 }
@@ -60,7 +62,7 @@ function Watermark({ text }: { text: string }) {
  * The full-resolution card canvas (background + blooms + grain + card) rendered
  * at its natural pixel dimensions with no transform — ideal for image export.
  */
-export const CardCanvas = forwardRef<HTMLDivElement, CanvasProps>(({ data, bg, grain, watermark }, ref) => {
+export const CardCanvas = forwardRef<HTMLDivElement, CanvasProps>(({ data, bg, grain, platform, watermark }, ref) => {
   const ratio = RATIOS[data.ratio];
   const inset = data.ratio === 'square' ? 30 : 28;
 
@@ -113,7 +115,7 @@ export const CardCanvas = forwardRef<HTMLDivElement, CanvasProps>(({ data, bg, g
         />
       )}
       <div className="absolute" style={{ inset }}>
-        <ReviewCard data={data} />
+        <ReviewCard data={data} platform={platform} />
       </div>
       {watermark && <Watermark text={watermark} />}
     </div>
@@ -123,7 +125,7 @@ export const CardCanvas = forwardRef<HTMLDivElement, CanvasProps>(({ data, bg, g
 CardCanvas.displayName = 'CardCanvas';
 
 /** Scales the card canvas to fit the available preview area. */
-export function Preview({ data, bg, grain, watermark }: CanvasProps) {
+export function Preview({ data, bg, grain, platform, watermark }: CanvasProps) {
   const ratio = RATIOS[data.ratio];
   const wrapRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -149,7 +151,7 @@ export function Preview({ data, bg, grain, watermark }: CanvasProps) {
     <div ref={wrapRef} className="relative flex-1 grid place-items-center overflow-hidden">
       <div style={{ width: ratio.w * scale, height: ratio.h * scale }}>
         <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}>
-          <CardCanvas data={data} bg={bg} grain={grain} watermark={watermark} />
+          <CardCanvas data={data} bg={bg} grain={grain} platform={platform} watermark={watermark} />
         </div>
       </div>
     </div>

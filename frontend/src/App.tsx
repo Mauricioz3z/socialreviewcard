@@ -30,7 +30,8 @@ import {
 import { Preview, CardCanvas } from './components/Preview';
 import { Field, Section, Segmented, StyleSwatch, Toggle } from './components/ui';
 import { AuthModal } from './components/AuthModal';
-import { BACKGROUNDS, CARD_STYLES, PLATFORMS, RATIOS } from './lib/config';
+import { BACKGROUNDS, CARD_STYLES, DEFAULT_PLATFORMS, resolvePlatform, RATIOS } from './lib/config';
+import { PlatformIcon } from './lib/platformIcon';
 import {
   ApiError,
   claimExport,
@@ -54,7 +55,7 @@ import type {
   CardData,
   CardStyleId,
   FontId,
-  PlatformKey,
+  PlatformDisplay,
   RatioId,
   SavedCard,
 } from './types';
@@ -102,7 +103,7 @@ export default function App() {
     "These earrings completely exceeded my expectations — the craftsmanship is stunning and they arrived beautifully wrapped. I've already ordered two more as gifts!",
   );
   const [name, setName] = useState('@bloom.and.willow');
-  const [platform, setPlatform] = useState<PlatformKey>('Etsy');
+  const [platform, setPlatform] = useState<string>('Etsy');
   const [rating, setRating] = useState(5);
   const [hoverStar, setHoverStar] = useState(0);
   const [avatar, setAvatar] = useState<AvatarMode>('initials');
@@ -142,6 +143,15 @@ export default function App() {
   // Free-plan exports get a watermark; Pro accounts never do.
   const watermark =
     config?.watermarkEnabled && !usage?.isPro ? config.watermarkText : null;
+
+  // Platforms come from the admin-managed config, falling back to built-ins
+  // until /api/config loads. Unknown/typed labels resolve to a "Custom" source.
+  const platforms: PlatformDisplay[] =
+    config?.platforms && config.platforms.length > 0
+      ? config.platforms.map((p) => ({ label: p.label, color: p.color, icon: p.icon }))
+      : DEFAULT_PLATFORMS;
+  const isCustomPlatform = !platforms.some((p) => p.label.toLowerCase() === platform.toLowerCase());
+  const platformDisplay = resolvePlatform(platform, platforms);
 
   const showToast = (title: string, desc: string, tone: 'success' | 'error' = 'success') =>
     setToast({ id: Date.now(), title, desc, tone });
@@ -306,7 +316,7 @@ export default function App() {
     setReview(c.reviewText);
     setName(c.reviewerName);
     setRating(c.rating);
-    setPlatform((c.platform as PlatformKey) in PLATFORMS ? (c.platform as PlatformKey) : 'Custom');
+    setPlatform(c.platform);
     setEditingId(c.id);
     try {
       const s = JSON.parse(c.stylesJson);
@@ -550,44 +560,67 @@ export default function App() {
 
             <Field label="Source platform">
               <div className="grid grid-cols-5 gap-1.5">
-                {(Object.entries(PLATFORMS) as [PlatformKey, (typeof PLATFORMS)[PlatformKey]][]).map(
-                  ([key, p]) => {
-                    const active = platform === key;
-                    const PIcon = p.Icon;
-                    return (
-                      <button
-                        key={key}
-                        onClick={() => setPlatform(key)}
-                        title={p.label}
+                {platforms.map((p) => {
+                  const active = !isCustomPlatform && platform.toLowerCase() === p.label.toLowerCase();
+                  return (
+                    <button
+                      key={p.label}
+                      onClick={() => setPlatform(p.label)}
+                      title={p.label}
+                      className={
+                        'flex flex-col items-center gap-1.5 py-2.5 rounded-xl border transition-all ' +
+                        (active ? 'border-accent bg-accent-soft' : 'border-zinc-200 hover:border-zinc-300 bg-white')
+                      }
+                    >
+                      <span
+                        className="grid place-items-center w-7 h-7 rounded-lg"
+                        style={{ background: active ? p.color : '#f4f4f5', color: active ? '#fff' : '#71717a' }}
+                      >
+                        <PlatformIcon token={p.icon} size={14} />
+                      </span>
+                      <span
                         className={
-                          'flex flex-col items-center gap-1.5 py-2.5 rounded-xl border transition-all ' +
-                          (active
-                            ? 'border-accent bg-accent-soft'
-                            : 'border-zinc-200 hover:border-zinc-300 bg-white')
+                          'text-[10px] font-medium leading-none truncate max-w-full ' +
+                          (active ? 'text-accent' : 'text-zinc-500')
                         }
                       >
-                        <span
-                          className="grid place-items-center w-7 h-7 rounded-lg"
-                          style={{
-                            background: active ? p.color : '#f4f4f5',
-                            color: active ? '#fff' : '#71717a',
-                          }}
-                        >
-                          <PIcon size={15} strokeWidth={2.2} />
-                        </span>
-                        <span
-                          className={
-                            'text-[10px] font-medium leading-none ' +
-                            (active ? 'text-accent' : 'text-zinc-500')
-                          }
-                        >
-                          {p.label}
-                        </span>
-                      </button>
-                    );
-                  },
-                )}
+                        {p.label}
+                      </span>
+                    </button>
+                  );
+                })}
+                {/* Custom = free-text source */}
+                <button
+                  onClick={() => setPlatform('')}
+                  title="Custom"
+                  className={
+                    'flex flex-col items-center gap-1.5 py-2.5 rounded-xl border transition-all ' +
+                    (isCustomPlatform ? 'border-accent bg-accent-soft' : 'border-zinc-200 hover:border-zinc-300 bg-white')
+                  }
+                >
+                  <span
+                    className="grid place-items-center w-7 h-7 rounded-lg"
+                    style={{ background: isCustomPlatform ? '#6d5efc' : '#f4f4f5', color: isCustomPlatform ? '#fff' : '#71717a' }}
+                  >
+                    <PlatformIcon token="fas:store" size={14} />
+                  </span>
+                  <span
+                    className={
+                      'text-[10px] font-medium leading-none ' + (isCustomPlatform ? 'text-accent' : 'text-zinc-500')
+                    }
+                  >
+                    Custom
+                  </span>
+                </button>
               </div>
+              {isCustomPlatform && (
+                <input
+                  value={platform}
+                  onChange={(e) => setPlatform(e.target.value.slice(0, 40))}
+                  placeholder="Source name (e.g. Trustpilot)"
+                  className="w-full mt-2 rounded-xl border border-zinc-200 bg-zinc-50/60 px-3.5 py-2.5 text-[13.5px] text-zinc-800 placeholder-zinc-400 outline-none transition focus:border-accent focus:bg-white focus:ring-4 focus:ring-accent/10"
+                />
+              )}
             </Field>
 
             <Field label="Rating">
@@ -859,12 +892,12 @@ export default function App() {
           }}
         />
 
-        <Preview data={data} bg={bg} grain={grain} watermark={watermark} />
+        <Preview data={data} bg={bg} grain={grain} platform={platformDisplay} watermark={watermark} />
       </main>
 
       {/* hidden full-res node used purely for the image export */}
       <div style={{ position: 'fixed', left: -100000, top: 0, pointerEvents: 'none' }} aria-hidden>
-        <CardCanvas ref={captureRef} data={data} bg={bg} grain={grain} watermark={watermark} />
+        <CardCanvas ref={captureRef} data={data} bg={bg} grain={grain} platform={platformDisplay} watermark={watermark} />
       </div>
 
       {/* ============ SAVED CARDS DRAWER ============ */}
@@ -873,6 +906,7 @@ export default function App() {
           cards={cards}
           loading={loadingCards}
           editingId={editingId}
+          platforms={platforms}
           onClose={() => setShowCards(false)}
           onLoad={loadCard}
           onDelete={removeCard}
@@ -909,7 +943,7 @@ export default function App() {
               <X size={18} />
             </button>
           </div>
-          <Preview data={data} bg={bg} grain={grain} watermark={watermark} />
+          <Preview data={data} bg={bg} grain={grain} platform={platformDisplay} watermark={watermark} />
         </div>
       )}
 
@@ -1168,6 +1202,7 @@ function SavedCardsDrawer({
   cards,
   loading,
   editingId,
+  platforms,
   onClose,
   onLoad,
   onDelete,
@@ -1175,6 +1210,7 @@ function SavedCardsDrawer({
   cards: SavedCard[];
   loading: boolean;
   editingId: string | null;
+  platforms: PlatformDisplay[];
   onClose: () => void;
   onLoad: (c: SavedCard) => void;
   onDelete: (id: string) => void;
@@ -1206,8 +1242,7 @@ function SavedCardsDrawer({
             </div>
           ) : (
             cards.map((c) => {
-              const plat = (c.platform as PlatformKey) in PLATFORMS ? PLATFORMS[c.platform as PlatformKey] : PLATFORMS.Custom;
-              const PIcon = plat.Icon;
+              const plat = resolvePlatform(c.platform, platforms);
               const editing = editingId === c.id;
               return (
                 <div
@@ -1222,7 +1257,7 @@ function SavedCardsDrawer({
                       className="grid place-items-center w-8 h-8 rounded-lg shrink-0 text-white"
                       style={{ background: plat.color }}
                     >
-                      <PIcon size={15} strokeWidth={2.2} />
+                      <PlatformIcon token={plat.icon} size={14} color="#fff" />
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="text-[13px] font-semibold text-zinc-800 truncate">{c.reviewerName || 'Customer'}</div>

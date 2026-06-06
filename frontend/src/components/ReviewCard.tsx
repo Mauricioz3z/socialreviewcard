@@ -1,6 +1,6 @@
 import { BadgeCheck, Star, User } from 'lucide-react';
-import { PLATFORMS } from '../lib/config';
-import type { CardData, CardStyleId } from '../types';
+import { PlatformIcon } from '../lib/platformIcon';
+import type { CardData, CardStyleId, PlatformDisplay } from '../types';
 
 interface StyleTheme {
   card: string;
@@ -61,11 +61,9 @@ const THEMES: Record<CardStyleId, StyleTheme> = {
   },
 };
 
-export function ReviewCard({ data }: { data: CardData }) {
-  const { review, name, platform, rating, avatar, cardStyle, font, ratio } = data;
+export function ReviewCard({ data, platform: plat }: { data: CardData; platform: PlatformDisplay }) {
+  const { review, name, rating, avatar, cardStyle, font, ratio } = data;
   const compact = ratio === 'square';
-  const plat = PLATFORMS[platform];
-  const PlatIcon = plat.Icon;
   const fontFamily = font === 'serif' ? 'Newsreader, serif' : '"Plus Jakarta Sans", sans-serif';
 
   const initials =
@@ -109,7 +107,7 @@ export function ReviewCard({ data }: { data: CardData }) {
             className="grid place-items-center rounded-full w-6 h-6"
             style={{ background: cardStyle === 'brutal' ? '#000' : plat.color, color: '#fff' }}
           >
-            <PlatIcon size={13} strokeWidth={2.4} />
+            <PlatformIcon token={plat.icon} size={12} color="#fff" />
           </span>
           {plat.label}
         </div>

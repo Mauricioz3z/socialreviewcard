@@ -9,14 +9,17 @@ import {
   Loader2,
   LogOut,
   MessageCircle,
+  Plus,
   RefreshCw,
   Save,
   Search,
   Shield,
+  Store,
   Trash2,
   Users,
 } from 'lucide-react';
 import { ApiError } from './lib/api';
+import { PlatformIcon, ICON_CHOICES } from './lib/platformIcon';
 import {
   adminDeleteUser,
   adminGetAudit,
@@ -25,6 +28,10 @@ import {
   adminGetSettings,
   adminListUsers,
   adminLogin,
+  adminListPlatforms,
+  adminCreatePlatform,
+  adminUpdatePlatform,
+  adminDeletePlatform,
   adminMarkFeedback,
   adminPutSettings,
   adminRefresh,
@@ -32,6 +39,7 @@ import {
   loadAdminSession,
   saveAdminSession,
   type AdminMetrics,
+  type AdminPlatform,
   type AdminSession,
   type AdminSettings,
   type AdminUser,
@@ -39,7 +47,15 @@ import {
   type FeedbackItem,
 } from './lib/adminApi';
 
-type Tab = 'dashboard' | 'users' | 'monetization' | 'watermark' | 'scripts' | 'feedback' | 'audit';
+type Tab =
+  | 'dashboard'
+  | 'users'
+  | 'platforms'
+  | 'monetization'
+  | 'watermark'
+  | 'scripts'
+  | 'feedback'
+  | 'audit';
 
 export default function AdminApp() {
   const [session, setSession] = useState<AdminSession | null>(() => loadAdminSession());
@@ -165,6 +181,7 @@ function AdminShell({
   const NAV: { id: Tab; label: string; Icon: typeof BarChart3 }[] = [
     { id: 'dashboard', label: 'Dashboard', Icon: BarChart3 },
     { id: 'users', label: 'Users', Icon: Users },
+    { id: 'platforms', label: 'Platforms', Icon: Store },
     { id: 'monetization', label: 'Monetization', Icon: Crown },
     { id: 'watermark', label: 'Watermark', Icon: Droplet },
     { id: 'scripts', label: 'Scripts', Icon: Code2 },
@@ -212,6 +229,7 @@ function AdminShell({
         <div className="max-w-5xl mx-auto p-7">
           {tab === 'dashboard' && <DashboardTab call={call} />}
           {tab === 'users' && <UsersTab call={call} flash={flash} />}
+          {tab === 'platforms' && <PlatformsTab call={call} flash={flash} />}
           {tab === 'monetization' && <MonetizationTab call={call} flash={flash} />}
           {tab === 'watermark' && <WatermarkTab call={call} flash={flash} />}
           {tab === 'scripts' && <ScriptsTab call={call} flash={flash} />}
@@ -530,6 +548,255 @@ function EditUserModal({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ====================================================================== */
+/*  Platforms                                                             */
+/* ====================================================================== */
+function PlatformsTab({ call, flash }: { call: Caller; flash: Flash }) {
+  const [items, setItems] = useState<AdminPlatform[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState<AdminPlatform | 'new' | null>(null);
+
+  const load = () => {
+    setLoading(true);
+    call(adminListPlatforms)
+      .then(setItems)
+      .catch(() => setItems([]))
+      .finally(() => setLoading(false));
+  };
+  useEffect(load, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const remove = async (p: AdminPlatform) => {
+    if (!confirm(`Delete platform "${p.label}"? Existing cards keep the label as plain text.`)) return;
+    try {
+      await call((t) => adminDeletePlatform(t, p.id));
+      flash('Platform deleted');
+      setItems((prev) => prev.filter((x) => x.id !== p.id));
+    } catch {
+      flash('Delete failed', 'err');
+    }
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <h1 className="text-[20px] font-bold tracking-tight">Platforms</h1>
+          <p className="text-[13px] text-zinc-500 mt-0.5">Review sources shown in the card picker</p>
+        </div>
+        <button
+          onClick={() => setEditing('new')}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-zinc-900 text-white text-[12.5px] font-semibold"
+        >
+          <Plus size={15} /> Add platform
+        </button>
+      </div>
+
+      {loading ? (
+        <Spinner />
+      ) : (
+        <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
+          <table className="w-full text-[13px]">
+            <thead className="bg-zinc-50 text-zinc-500 text-[11.5px] uppercase tracking-wide">
+              <tr>
+                <th className="text-left font-semibold px-4 py-2.5">Platform</th>
+                <th className="text-left font-semibold px-4 py-2.5">Icon</th>
+                <th className="text-right font-semibold px-4 py-2.5">Order</th>
+                <th className="text-left font-semibold px-4 py-2.5">Status</th>
+                <th className="px-4 py-2.5"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((p) => (
+                <tr key={p.id} className="border-t border-zinc-100">
+                  <td className="px-4 py-2.5">
+                    <span className="inline-flex items-center gap-2">
+                      <span
+                        className="grid place-items-center w-7 h-7 rounded-lg text-white"
+                        style={{ background: p.color }}
+                      >
+                        <PlatformIcon token={p.icon} size={13} color="#fff" />
+                      </span>
+                      <span className="font-medium">{p.label}</span>
+                    </span>
+                  </td>
+                  <td className="px-4 py-2.5 font-mono text-[12px] text-zinc-500">{p.icon}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums">{p.sortOrder}</td>
+                  <td className="px-4 py-2.5">
+                    {p.enabled ? (
+                      <span className="text-emerald-600 text-[12px] font-semibold">Enabled</span>
+                    ) : (
+                      <span className="text-zinc-400 text-[12px]">Hidden</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                    <button
+                      onClick={() => setEditing(p)}
+                      className="text-[12px] font-semibold text-accent hover:underline mr-3"
+                    >
+                      Edit
+                    </button>
+                    <button onClick={() => remove(p)} className="text-zinc-400 hover:text-red-600">
+                      <Trash2 size={15} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {items.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-10 text-center text-zinc-400">
+                    No platforms yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {editing && (
+        <PlatformEditModal
+          platform={editing === 'new' ? null : editing}
+          call={call}
+          flash={flash}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            load();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function PlatformEditModal({
+  platform,
+  call,
+  flash,
+  onClose,
+  onSaved,
+}: {
+  platform: AdminPlatform | null;
+  call: Caller;
+  flash: Flash;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [label, setLabel] = useState(platform?.label ?? '');
+  const [color, setColor] = useState(platform?.color ?? '#6d5efc');
+  const [icon, setIcon] = useState(platform?.icon ?? 'fab:etsy');
+  const [sortOrder, setSortOrder] = useState(platform?.sortOrder ?? 0);
+  const [enabled, setEnabled] = useState(platform?.enabled ?? true);
+  const [saving, setSaving] = useState(false);
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!label.trim() || saving) return;
+    setSaving(true);
+    const body = { label: label.trim(), color, icon, sortOrder, enabled };
+    try {
+      if (platform) await call((t) => adminUpdatePlatform(t, platform.id, body));
+      else await call((t) => adminCreatePlatform(t, body));
+      flash('Platform saved');
+      onSaved();
+    } catch {
+      flash('Save failed', 'err');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" onClick={onClose}>
+      <form
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={save}
+        className="w-full max-w-[400px] bg-white rounded-2xl shadow-2xl p-6"
+      >
+        <div className="flex items-center gap-2.5 mb-5">
+          <span className="grid place-items-center w-9 h-9 rounded-lg text-white" style={{ background: color }}>
+            <PlatformIcon token={icon} size={16} color="#fff" />
+          </span>
+          <div className="font-bold text-[15px]">{platform ? 'Edit platform' : 'New platform'}</div>
+        </div>
+
+        <label className="block text-[12px] text-zinc-500 mb-1">Label</label>
+        <input
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          autoFocus
+          maxLength={40}
+          className="w-full mb-3 rounded-lg border border-zinc-200 px-3 py-2 text-[13px] outline-none focus:border-accent"
+        />
+
+        <label className="block text-[12px] text-zinc-500 mb-1">Icon</label>
+        <select
+          value={icon}
+          onChange={(e) => setIcon(e.target.value)}
+          className="w-full mb-3 rounded-lg border border-zinc-200 px-3 py-2 text-[13px] outline-none focus:border-accent"
+        >
+          {ICON_CHOICES.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+
+        <div className="flex gap-3 mb-3">
+          <div className="flex-1">
+            <label className="block text-[12px] text-zinc-500 mb-1">Color</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                className="w-9 h-9 rounded border border-zinc-200 p-0.5 shrink-0"
+              />
+              <input
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                className="flex-1 min-w-0 rounded-lg border border-zinc-200 px-3 py-2 text-[13px] outline-none focus:border-accent"
+              />
+            </div>
+          </div>
+          <div className="w-24">
+            <label className="block text-[12px] text-zinc-500 mb-1">Order</label>
+            <input
+              type="number"
+              value={sortOrder}
+              onChange={(e) => setSortOrder(Number(e.target.value))}
+              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-[13px] outline-none focus:border-accent"
+            />
+          </div>
+        </div>
+
+        <label className="flex items-center gap-2 mb-5 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) => setEnabled(e.target.checked)}
+            className="w-4 h-4 accent-[#6d5efc]"
+          />
+          <span className="text-[13px]">Show in picker</span>
+        </label>
+
+        <div className="flex gap-2">
+          <button type="button" onClick={onClose} className="flex-1 h-10 rounded-lg border border-zinc-200 text-[13px] font-semibold">
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className="flex-1 h-10 rounded-lg bg-zinc-900 text-white text-[13px] font-semibold flex items-center justify-center gap-2 disabled:opacity-60"
+          >
+            {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Save
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

@@ -1,26 +1,23 @@
-import {
-  ShoppingBag,
-  ShoppingCart,
-  Package,
-  Camera,
-  Sparkles,
-  type LucideIcon,
-} from 'lucide-react';
-import type { CardStyleId, PlatformKey, RatioId } from '../types';
+import type { CardStyleId, PlatformDisplay, RatioId } from '../types';
 
-export interface PlatformConfig {
-  label: string;
-  Icon: LucideIcon;
-  color: string;
+/** Built-in platforms used until /api/config loads (mirrors the backend seed). */
+export const DEFAULT_PLATFORMS: PlatformDisplay[] = [
+  { label: 'Etsy', color: '#F1641E', icon: 'fab:etsy' },
+  { label: 'Shopify', color: '#5E8E3E', icon: 'fab:shopify' },
+  { label: 'Amazon', color: '#E88A1A', icon: 'fab:amazon' },
+  { label: 'Instagram', color: '#E1306C', icon: 'fab:instagram' },
+  { label: 'Google', color: '#4285F4', icon: 'fab:google' },
+];
+
+/** Display config for the free-text "Custom" source. */
+export const CUSTOM_PLATFORM: PlatformDisplay = { label: 'Custom', color: '#6d5efc', icon: 'fas:store' };
+
+/** Resolves a stored platform label to its display config; unknown = custom (free text). */
+export function resolvePlatform(label: string, platforms: PlatformDisplay[]): PlatformDisplay {
+  const found = platforms.find((p) => p.label.toLowerCase() === (label || '').toLowerCase());
+  if (found) return found;
+  return { label: label || 'Custom', color: CUSTOM_PLATFORM.color, icon: CUSTOM_PLATFORM.icon };
 }
-
-export const PLATFORMS: Record<PlatformKey, PlatformConfig> = {
-  Etsy: { label: 'Etsy', Icon: ShoppingBag, color: '#F1641E' },
-  Shopify: { label: 'Shopify', Icon: ShoppingCart, color: '#5E8E3E' },
-  Amazon: { label: 'Amazon', Icon: Package, color: '#E88A1A' },
-  Instagram: { label: 'Instagram', Icon: Camera, color: '#E1306C' },
-  Custom: { label: 'Custom', Icon: Sparkles, color: '#6d5efc' },
-};
 
 export interface BackgroundConfig {
   id: string;

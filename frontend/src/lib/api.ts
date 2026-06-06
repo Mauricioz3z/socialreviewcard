@@ -108,6 +108,15 @@ export async function refresh(refreshToken: string, email: string): Promise<Auth
 
 /* ----------------------------- Public config ----------------------------- */
 
+export interface PublicPlatform {
+  id: number;
+  label: string;
+  color: string;
+  icon: string;
+  sortOrder: number;
+  enabled: boolean;
+}
+
 export interface PublicConfig {
   freeExportLimit: number;
   proPriceLabel: string;
@@ -118,6 +127,7 @@ export interface PublicConfig {
   watermarkText: string;
   headScripts: string;
   bodyScripts: string;
+  platforms: PublicPlatform[];
 }
 
 /** Anonymous runtime config (scripts, watermark, monetization copy). */
