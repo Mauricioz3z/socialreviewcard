@@ -18,6 +18,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<ReviewCard> ReviewCards => Set<ReviewCard>();
     public DbSet<PlatformSettings> PlatformSettings => Set<PlatformSettings>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<Feedback> Feedback => Set<Feedback>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -84,6 +85,16 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             entity.Property(a => a.Action).IsRequired().HasMaxLength(80);
             entity.Property(a => a.IpAddress).HasMaxLength(64);
             entity.HasIndex(a => a.TimestampUtc);
+        });
+
+        builder.Entity<Feedback>(entity =>
+        {
+            entity.HasKey(f => f.Id);
+            entity.Property(f => f.Type).IsRequired().HasMaxLength(20);
+            entity.Property(f => f.Message).IsRequired().HasMaxLength(4000);
+            entity.Property(f => f.Email).HasMaxLength(256);
+            entity.Property(f => f.IpAddress).HasMaxLength(64);
+            entity.HasIndex(f => f.CreatedAt);
         });
     }
 }

@@ -212,6 +212,46 @@ public static class AdminEndpoints
             return Results.Ok(ToSettingsDto(s));
         });
 
+        // GET /api/admin/feedback?skip=&take=
+        group.MapGet("/feedback", async (ApplicationDbContext db, int skip, int take, CancellationToken ct) =>
+        {
+            take = take is <= 0 or > 200 ? 50 : take;
+            skip = skip < 0 ? 0 : skip;
+
+            var total = await db.Feedback.CountAsync(ct);
+            var unhandled = await db.Feedback.CountAsync(f => !f.Handled, ct);
+            var rows = await db.Feedback.AsNoTracking()
+                .OrderByDescending(f => f.CreatedAt)
+                .Skip(skip).Take(take)
+                .Select(f => new FeedbackDto
+                {
+                    Id = f.Id,
+                    CreatedAt = f.CreatedAt,
+                    Type = f.Type,
+                    Message = f.Message,
+                    Email = f.Email,
+                    Handled = f.Handled,
+                    IpAddress = f.IpAddress,
+                })
+                .ToListAsync(ct);
+
+            return Results.Ok(new FeedbackListResponse { Total = total, Unhandled = unhandled, Items = rows });
+        });
+
+        // PATCH /api/admin/feedback/{id} -> toggle handled flag.
+        group.MapPatch("/feedback/{id:guid}", async (
+            Guid id,
+            [FromBody] FeedbackHandledRequest request,
+            ApplicationDbContext db,
+            CancellationToken ct) =>
+        {
+            var fb = await db.Feedback.FirstOrDefaultAsync(f => f.Id == id, ct);
+            if (fb is null) return Results.NotFound();
+            fb.Handled = request.Handled;
+            await db.SaveChangesAsync(ct);
+            return Results.Ok(new { ok = true });
+        });
+
         // GET /api/admin/audit?skip=&take=
         group.MapGet("/audit", async (ApplicationDbContext db, int skip, int take, CancellationToken ct) =>
         {

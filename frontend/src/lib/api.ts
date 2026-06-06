@@ -125,6 +125,20 @@ export function getConfig(): Promise<PublicConfig> {
   return request<PublicConfig>('/api/config', { method: 'GET' });
 }
 
+export type FeedbackType = 'suggestion' | 'criticism' | 'support';
+
+/** Submits an in-app feedback/support message. Token is optional (captured if signed in). */
+export function submitFeedback(
+  body: { type: FeedbackType; message: string; email?: string },
+  token?: string | null,
+): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>('/api/feedback', {
+    method: 'POST',
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
 /* ----------------------------- Cards ----------------------------- */
 
 export function getCards(token: string): Promise<SavedCard[]> {

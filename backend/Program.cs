@@ -146,8 +146,9 @@ app.MapCardEndpoints();
 app.MapBillingEndpoints();
 app.MapUsageEndpoints();
 
-// Public runtime config + admin backoffice.
+// Public runtime config + feedback + admin backoffice.
 app.MapConfigEndpoints();
+app.MapFeedbackEndpoints();
 app.MapAdminEndpoints();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" })).WithTags("System");

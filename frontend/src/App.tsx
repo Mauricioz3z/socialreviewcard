@@ -12,6 +12,7 @@ import {
   LayoutPanelTop,
   Loader2,
   LogOut,
+  MessageCircle,
   MessageSquareQuote,
   Palette,
   Quote,
@@ -42,6 +43,8 @@ import {
   saveCard,
   saveSession,
   startCheckout,
+  submitFeedback,
+  type FeedbackType,
   type PublicConfig,
   type UsageInfo,
 } from './lib/api';
@@ -112,6 +115,8 @@ export default function App() {
   // ---- app state ----
   const [exporting, setExporting] = useState(false);
   const [sharing, setSharing] = useState(false);
+  // Whether the browser can share image files (true on mobile, usually false on desktop).
+  const [canShareFiles, setCanShareFiles] = useState(true);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [session, setSession] = useState<AuthSession | null>(() => loadSession());
   const [showAuth, setShowAuth] = useState(false);
@@ -124,6 +129,8 @@ export default function App() {
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [usage, setUsage] = useState<UsageInfo | null>(null);
   const [config, setConfig] = useState<PublicConfig | null>(null);
+  const [showMobilePreview, setShowMobilePreview] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
 
   const captureRef = useRef<HTMLDivElement>(null);
 
@@ -143,6 +150,16 @@ export default function App() {
   useEffect(() => {
     saveSession(session);
   }, [session]);
+
+  // Detect native file-share support once (drives the "mobile only" hint).
+  useEffect(() => {
+    try {
+      const probe = new File([new Blob([''], { type: 'image/png' })], 'p.png', { type: 'image/png' });
+      setCanShareFiles(!!navigator.canShare && navigator.canShare({ files: [probe] }));
+    } catch {
+      setCanShareFiles(false);
+    }
+  }, []);
 
   /* ----------------- runtime config + third-party scripts ----------------- */
   useEffect(() => {
@@ -467,15 +484,38 @@ export default function App() {
   return (
     <div className="h-full flex font-ui text-zinc-900">
       {/* ============ LEFT: CONTROL PANEL ============ */}
-      <aside className="w-[396px] shrink-0 h-full bg-white border-r border-zinc-200 flex flex-col">
+      <aside className="w-full lg:w-[396px] lg:shrink-0 h-full bg-white border-r border-zinc-200 flex flex-col">
         {/* brand header */}
-        <div className="px-5 h-[68px] shrink-0 flex items-center gap-3 border-b border-zinc-100">
-          <div className="grid place-items-center w-9 h-9 rounded-xl bg-zinc-900 text-white">
-            <Quote size={18} strokeWidth={2.2} />
+        <div className="px-5 h-[68px] shrink-0 flex items-center justify-between gap-3 border-b border-zinc-100">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="grid place-items-center w-9 h-9 rounded-xl bg-zinc-900 text-white shrink-0">
+              <Quote size={18} strokeWidth={2.2} />
+            </div>
+            <div className="min-w-0">
+              <div className="font-bold text-[16px] tracking-tight leading-none">ReviewCraft</div>
+              <div className="text-[11.5px] text-zinc-400 mt-0.5 truncate">Turn reviews into shareable art</div>
+            </div>
           </div>
-          <div>
-            <div className="font-bold text-[16px] tracking-tight leading-none">ReviewCraft</div>
-            <div className="text-[11.5px] text-zinc-400 mt-0.5">Turn reviews into shareable art</div>
+          {/* account control — mobile only (desktop has it in the preview header) */}
+          <div className="lg:hidden shrink-0">
+            {session ? (
+              <AccountMenu
+                email={session.email}
+                subscription={subscription}
+                onUpgrade={onUpgrade}
+                upgrading={upgrading}
+                onSignOut={signOut}
+                onMyCards={() => setShowCards(true)}
+                dark={false}
+              />
+            ) : (
+              <button
+                onClick={() => setShowAuth(true)}
+                className="px-3 py-1.5 rounded-full bg-zinc-900 text-white text-[12px] font-semibold hover:bg-zinc-800 transition"
+              >
+                Sign in
+              </button>
+            )}
           </div>
         </div>
 
@@ -697,6 +737,13 @@ export default function App() {
 
         {/* sticky export */}
         <div className="shrink-0 p-4 border-t border-zinc-100 bg-white space-y-2">
+          {/* mobile-only: open the preview (no room for a side-by-side pane) */}
+          <button
+            onClick={() => setShowMobilePreview(true)}
+            className="lg:hidden w-full flex items-center justify-center gap-2 h-11 rounded-xl border border-zinc-200 bg-zinc-50 text-zinc-800 text-[13.5px] font-semibold transition-all hover:border-zinc-300 active:scale-[0.99]"
+          >
+            <Eye size={16} strokeWidth={2.2} /> Preview card
+          </button>
           <button
             onClick={doExport}
             disabled={exporting}
@@ -727,6 +774,11 @@ export default function App() {
               </>
             )}
           </button>
+          {!canShareFiles && (
+            <p className="text-center text-[11px] text-zinc-400 -mt-0.5 leading-snug">
+              Direct sharing is mobile-only — on desktop the image downloads so you can upload it.
+            </p>
+          )}
           <button
             onClick={onSave}
             disabled={saving}
@@ -761,8 +813,8 @@ export default function App() {
         </div>
       </aside>
 
-      {/* ============ RIGHT: PREVIEW ============ */}
-      <main className="flex-1 h-full flex flex-col bg-zinc-950 relative">
+      {/* ============ RIGHT: PREVIEW (desktop only) ============ */}
+      <main className="hidden lg:flex flex-1 h-full flex-col bg-zinc-950 relative">
         <div className="h-[68px] shrink-0 flex items-center justify-between px-7 border-b border-white/5">
           <div className="flex items-center gap-2.5 text-zinc-300">
             <Eye size={16} strokeWidth={2} />
@@ -785,6 +837,7 @@ export default function App() {
                 upgrading={upgrading}
                 onSignOut={signOut}
                 onMyCards={() => setShowCards(true)}
+                dark
               />
             ) : (
               <button
@@ -838,6 +891,40 @@ export default function App() {
 
       {/* ============ AUTH MODAL ============ */}
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} onAuthed={onAuthed} />}
+
+      {/* ============ MOBILE PREVIEW MODAL ============ */}
+      {showMobilePreview && (
+        <div className="lg:hidden fixed inset-0 z-[58] flex flex-col bg-zinc-950">
+          <div className="h-14 shrink-0 flex items-center justify-between px-4 border-b border-white/5">
+            <div className="flex items-center gap-2 text-zinc-300">
+              <Eye size={16} strokeWidth={2} />
+              <span className="text-[13px] font-medium">
+                Preview · {RATIOS[ratio].label} {RATIOS[ratio].dims}
+              </span>
+            </div>
+            <button
+              onClick={() => setShowMobilePreview(false)}
+              className="grid place-items-center w-9 h-9 rounded-full bg-white/10 text-white hover:bg-white/20 transition"
+            >
+              <X size={18} />
+            </button>
+          </div>
+          <Preview data={data} bg={bg} grain={grain} watermark={watermark} />
+        </div>
+      )}
+
+      {/* ============ FEEDBACK ============ */}
+      <button
+        onClick={() => setShowFeedback(true)}
+        title="Send feedback or get support"
+        className="fixed bottom-5 right-5 z-40 flex items-center gap-2 h-11 pl-3.5 pr-4 rounded-full bg-accent text-white shadow-lg hover:bg-accent-hover active:scale-95 transition"
+      >
+        <MessageCircle size={18} strokeWidth={2.2} />
+        <span className="hidden sm:inline text-[13px] font-semibold">Feedback</span>
+      </button>
+      {showFeedback && (
+        <FeedbackModal session={session} onClose={() => setShowFeedback(false)} showToast={showToast} />
+      )}
 
       {/* ============ TOAST ============ */}
       {toast && (
@@ -982,6 +1069,7 @@ function AccountMenu({
   upgrading,
   onSignOut,
   onMyCards,
+  dark = false,
 }: {
   email: string;
   subscription: 'free' | 'pro';
@@ -989,6 +1077,7 @@ function AccountMenu({
   upgrading: boolean;
   onSignOut: () => void;
   onMyCards: () => void;
+  dark?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const initials = email.slice(0, 2).toUpperCase();
@@ -996,12 +1085,23 @@ function AccountMenu({
     <div className="relative ml-1">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 pl-1 pr-2.5 py-1 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition"
+        className={
+          'flex items-center gap-2 pl-1 pr-2.5 py-1 rounded-full border transition ' +
+          (dark
+            ? 'bg-white/5 border-white/10 hover:bg-white/10'
+            : 'bg-zinc-50 border-zinc-200 hover:bg-zinc-100')
+        }
       >
         <span className="grid place-items-center w-6 h-6 rounded-full bg-accent text-white text-[10px] font-bold">
           {initials}
         </span>
-        <span className="text-[12px] text-zinc-200 font-medium max-w-[120px] truncate">{email}</span>
+        <span
+          className={
+            'text-[12px] font-medium max-w-[120px] truncate ' + (dark ? 'text-zinc-200' : 'text-zinc-700')
+          }
+        >
+          {email}
+        </span>
         {subscription === 'pro' && <Crown size={13} className="text-amber-400" />}
       </button>
 
@@ -1150,6 +1250,121 @@ function SavedCardsDrawer({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Feedback / support modal                                          */
+/* ------------------------------------------------------------------ */
+function FeedbackModal({
+  session,
+  onClose,
+  showToast,
+}: {
+  session: AuthSession | null;
+  onClose: () => void;
+  showToast: (title: string, desc: string, tone?: 'success' | 'error') => void;
+}) {
+  const [type, setType] = useState<FeedbackType>('suggestion');
+  const [message, setMessage] = useState('');
+  const [email, setEmail] = useState(session?.email ?? '');
+  const [busy, setBusy] = useState(false);
+
+  const types: { id: FeedbackType; label: string }[] = [
+    { id: 'suggestion', label: 'Suggestion' },
+    { id: 'criticism', label: 'Criticism' },
+    { id: 'support', label: 'Support' },
+  ];
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (message.trim().length < 3 || busy) return;
+    setBusy(true);
+    try {
+      await submitFeedback(
+        { type, message: message.trim(), email: email.trim() || undefined },
+        session?.accessToken,
+      );
+      showToast('Thanks for the feedback', 'We received your message.');
+      onClose();
+    } catch {
+      showToast('Could not send', 'Please try again in a moment.', 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] grid place-items-center bg-black/40 backdrop-blur-sm p-4"
+      onClick={onClose}
+    >
+      <form
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={submit}
+        className="w-full max-w-[420px] bg-white rounded-2xl shadow-2xl ring-1 ring-black/5 overflow-hidden font-ui"
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-100">
+          <div className="flex items-center gap-2.5">
+            <span className="grid place-items-center w-8 h-8 rounded-lg bg-accent text-white">
+              <MessageCircle size={16} strokeWidth={2.2} />
+            </span>
+            <div>
+              <div className="font-bold text-[15px] leading-none">Send feedback</div>
+              <div className="text-[12px] text-zinc-400 mt-1">Ideas, problems or support — we read everything</div>
+            </div>
+          </div>
+          <button type="button" onClick={onClose} className="text-zinc-300 hover:text-zinc-500 transition">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="px-5 py-5">
+          <div className="grid grid-cols-3 gap-1.5 mb-3">
+            {types.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setType(t.id)}
+                className={
+                  'h-9 rounded-lg text-[12.5px] font-semibold border transition ' +
+                  (type === t.id
+                    ? 'border-accent bg-accent-soft text-accent'
+                    : 'border-zinc-200 text-zinc-600 hover:border-zinc-300')
+                }
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            rows={4}
+            maxLength={4000}
+            autoFocus
+            placeholder="Tell us what's on your mind…"
+            className="w-full resize-none rounded-xl border border-zinc-200 bg-zinc-50/60 px-3.5 py-3 text-[13.5px] text-zinc-800 placeholder-zinc-400 outline-none transition focus:border-accent focus:bg-white"
+          />
+          <input
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            type="email"
+            placeholder="Email (optional, so we can reply)"
+            className="w-full mt-2 rounded-xl border border-zinc-200 bg-zinc-50/60 px-3.5 py-2.5 text-[13px] text-zinc-800 placeholder-zinc-400 outline-none transition focus:border-accent focus:bg-white"
+          />
+
+          <button
+            type="submit"
+            disabled={busy || message.trim().length < 3}
+            className="w-full mt-4 h-11 rounded-xl bg-zinc-900 text-white text-[14px] font-semibold flex items-center justify-center gap-2 transition hover:bg-zinc-800 disabled:opacity-50"
+          >
+            {busy ? <Loader2 size={16} className="animate-spin" /> : <MessageCircle size={16} />} Send
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

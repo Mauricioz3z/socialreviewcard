@@ -3,10 +3,12 @@ import {
   Activity,
   BarChart3,
   Code2,
+  Check,
   Crown,
   Droplet,
   Loader2,
   LogOut,
+  MessageCircle,
   RefreshCw,
   Save,
   Search,
@@ -18,10 +20,12 @@ import { ApiError } from './lib/api';
 import {
   adminDeleteUser,
   adminGetAudit,
+  adminGetFeedback,
   adminGetMetrics,
   adminGetSettings,
   adminListUsers,
   adminLogin,
+  adminMarkFeedback,
   adminPutSettings,
   adminRefresh,
   adminUpdateUser,
@@ -32,9 +36,10 @@ import {
   type AdminSettings,
   type AdminUser,
   type AuditLogItem,
+  type FeedbackItem,
 } from './lib/adminApi';
 
-type Tab = 'dashboard' | 'users' | 'monetization' | 'watermark' | 'scripts' | 'audit';
+type Tab = 'dashboard' | 'users' | 'monetization' | 'watermark' | 'scripts' | 'feedback' | 'audit';
 
 export default function AdminApp() {
   const [session, setSession] = useState<AdminSession | null>(() => loadAdminSession());
@@ -163,6 +168,7 @@ function AdminShell({
     { id: 'monetization', label: 'Monetization', Icon: Crown },
     { id: 'watermark', label: 'Watermark', Icon: Droplet },
     { id: 'scripts', label: 'Scripts', Icon: Code2 },
+    { id: 'feedback', label: 'Feedback', Icon: MessageCircle },
     { id: 'audit', label: 'Audit log', Icon: Activity },
   ];
 
@@ -209,6 +215,7 @@ function AdminShell({
           {tab === 'monetization' && <MonetizationTab call={call} flash={flash} />}
           {tab === 'watermark' && <WatermarkTab call={call} flash={flash} />}
           {tab === 'scripts' && <ScriptsTab call={call} flash={flash} />}
+          {tab === 'feedback' && <FeedbackTab call={call} flash={flash} />}
           {tab === 'audit' && <AuditTab call={call} />}
         </div>
       </main>
@@ -671,6 +678,99 @@ function ScriptsTab({ call, flash }: { call: Caller; flash: Flash }) {
         />
         <SaveBar saving={saving} onSave={() => persist(call, flash, settings, setSettings, setSaving)} />
       </Panel>
+    </div>
+  );
+}
+
+/* ====================================================================== */
+/*  Feedback                                                              */
+/* ====================================================================== */
+function FeedbackTab({ call, flash }: { call: Caller; flash: Flash }) {
+  const [items, setItems] = useState<FeedbackItem[]>([]);
+  const [unhandled, setUnhandled] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  const load = () => {
+    setLoading(true);
+    call((t) => adminGetFeedback(t, 0, 100))
+      .then((r) => {
+        setItems(r.items);
+        setUnhandled(r.unhandled);
+      })
+      .catch(() => setItems([]))
+      .finally(() => setLoading(false));
+  };
+  useEffect(load, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const toggle = async (f: FeedbackItem) => {
+    try {
+      await call((t) => adminMarkFeedback(t, f.id, !f.handled));
+      setItems((prev) => prev.map((x) => (x.id === f.id ? { ...x, handled: !x.handled } : x)));
+      setUnhandled((n) => n + (f.handled ? 1 : -1));
+    } catch {
+      flash('Could not update', 'err');
+    }
+  };
+
+  const TYPE_COLOR: Record<string, string> = {
+    suggestion: 'bg-blue-100 text-blue-700',
+    criticism: 'bg-amber-100 text-amber-700',
+    support: 'bg-red-100 text-red-700',
+  };
+
+  return (
+    <div>
+      <Header title="Feedback" subtitle={`${unhandled} unread`} onRefresh={load} />
+      {loading ? (
+        <Spinner />
+      ) : items.length === 0 ? (
+        <div className="bg-white rounded-xl border border-zinc-200 py-16 text-center text-zinc-400 text-[13px]">
+          No messages yet.
+        </div>
+      ) : (
+        <div className="space-y-2.5">
+          {items.map((f) => (
+            <div
+              key={f.id}
+              className={
+                'bg-white rounded-xl border p-4 ' + (f.handled ? 'border-zinc-200 opacity-60' : 'border-zinc-300')
+              }
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={
+                      'px-2 py-0.5 rounded-full text-[11px] font-semibold ' +
+                      (TYPE_COLOR[f.type] ?? 'bg-zinc-100 text-zinc-600')
+                    }
+                  >
+                    {f.type}
+                  </span>
+                  <span className="text-[12px] text-zinc-400">{new Date(f.createdAt).toLocaleString()}</span>
+                </div>
+                <button
+                  onClick={() => toggle(f)}
+                  className={
+                    'flex items-center gap-1.5 text-[12px] font-semibold transition ' +
+                    (f.handled ? 'text-zinc-400 hover:text-zinc-600' : 'text-emerald-600 hover:text-emerald-700')
+                  }
+                >
+                  <Check size={14} /> {f.handled ? 'Handled' : 'Mark handled'}
+                </button>
+              </div>
+              <p className="text-[13.5px] text-zinc-800 whitespace-pre-wrap">{f.message}</p>
+              {f.email && (
+                <a
+                  href={`mailto:${f.email}`}
+                  className="inline-block mt-2 text-[12.5px] text-accent hover:underline"
+                >
+                  {f.email}
+                </a>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

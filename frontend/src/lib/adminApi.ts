@@ -113,6 +113,22 @@ export interface AuditLogList {
   items: AuditLogItem[];
 }
 
+export interface FeedbackItem {
+  id: string;
+  createdAt: string;
+  type: string;
+  message: string;
+  email: string | null;
+  handled: boolean;
+  ipAddress: string | null;
+}
+
+export interface FeedbackList {
+  total: number;
+  unhandled: number;
+  items: FeedbackItem[];
+}
+
 /* ----------------------------- Auth ----------------------------- */
 
 interface TokenResponse {
@@ -171,3 +187,12 @@ export const adminPutSettings = (token: string, settings: AdminSettings) =>
 
 export const adminGetAudit = (token: string, skip: number, take: number) =>
   adminRequest<AuditLogList>(`/api/admin/audit?skip=${skip}&take=${take}`, token);
+
+export const adminGetFeedback = (token: string, skip: number, take: number) =>
+  adminRequest<FeedbackList>(`/api/admin/feedback?skip=${skip}&take=${take}`, token);
+
+export const adminMarkFeedback = (token: string, id: string, handled: boolean) =>
+  adminRequest<{ ok: boolean }>(`/api/admin/feedback/${id}`, token, {
+    method: 'PATCH',
+    body: JSON.stringify({ handled }),
+  });
