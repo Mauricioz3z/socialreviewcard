@@ -1,0 +1,870 @@
+import { useEffect, useState } from 'react';
+import {
+  Activity,
+  BarChart3,
+  Code2,
+  Crown,
+  Droplet,
+  Loader2,
+  LogOut,
+  RefreshCw,
+  Save,
+  Search,
+  Shield,
+  Trash2,
+  Users,
+} from 'lucide-react';
+import { ApiError } from './lib/api';
+import {
+  adminDeleteUser,
+  adminGetAudit,
+  adminGetMetrics,
+  adminGetSettings,
+  adminListUsers,
+  adminLogin,
+  adminPutSettings,
+  adminRefresh,
+  adminUpdateUser,
+  loadAdminSession,
+  saveAdminSession,
+  type AdminMetrics,
+  type AdminSession,
+  type AdminSettings,
+  type AdminUser,
+  type AuditLogItem,
+} from './lib/adminApi';
+
+type Tab = 'dashboard' | 'users' | 'monetization' | 'watermark' | 'scripts' | 'audit';
+
+export default function AdminApp() {
+  const [session, setSession] = useState<AdminSession | null>(() => loadAdminSession());
+
+  useEffect(() => {
+    saveAdminSession(session);
+  }, [session]);
+
+  if (!session) return <AdminLogin onLogin={setSession} />;
+  return <AdminShell session={session} setSession={setSession} onLogout={() => setSession(null)} />;
+}
+
+/* ====================================================================== */
+/*  Login                                                                 */
+/* ====================================================================== */
+function AdminLogin({ onLogin }: { onLogin: (s: AdminSession) => void }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      onLogin(await adminLogin(email.trim(), password));
+    } catch (err) {
+      setError(err instanceof ApiError && err.status === 401 ? 'Invalid credentials.' : 'Sign-in failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen grid place-items-center bg-zinc-950 text-zinc-100 p-4 font-ui">
+      <form onSubmit={submit} className="w-full max-w-[360px] bg-zinc-900 border border-white/10 rounded-2xl p-7 shadow-2xl">
+        <div className="flex items-center gap-2.5 mb-6">
+          <span className="grid place-items-center w-9 h-9 rounded-xl bg-accent text-white">
+            <Shield size={18} strokeWidth={2.2} />
+          </span>
+          <div>
+            <div className="font-bold text-[15px] leading-none">Admin backoffice</div>
+            <div className="text-[11.5px] text-zinc-500 mt-1">SocialReviewCard</div>
+          </div>
+        </div>
+
+        <label className="block text-[12px] text-zinc-400 mb-1">Email</label>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          autoFocus
+          required
+          className="w-full mb-3 rounded-lg bg-zinc-800 border border-white/10 px-3 py-2.5 text-[13.5px] outline-none focus:border-accent"
+        />
+        <label className="block text-[12px] text-zinc-400 mb-1">Password</label>
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          className="w-full mb-4 rounded-lg bg-zinc-800 border border-white/10 px-3 py-2.5 text-[13.5px] outline-none focus:border-accent"
+        />
+
+        {error && (
+          <div className="mb-4 text-[12.5px] text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+            {error}
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={busy}
+          className="w-full flex items-center justify-center gap-2 h-11 rounded-lg bg-accent text-white text-[14px] font-semibold hover:opacity-90 transition disabled:opacity-60"
+        >
+          {busy ? <Loader2 size={17} className="animate-spin" /> : <Shield size={17} />} Sign in
+        </button>
+      </form>
+    </div>
+  );
+}
+
+/* ====================================================================== */
+/*  Shell                                                                 */
+/* ====================================================================== */
+function AdminShell({
+  session,
+  setSession,
+  onLogout,
+}: {
+  session: AdminSession;
+  setSession: (s: AdminSession) => void;
+  onLogout: () => void;
+}) {
+  const [tab, setTab] = useState<Tab>('dashboard');
+  const [toast, setToast] = useState<{ msg: string; tone: 'ok' | 'err' } | null>(null);
+
+  const flash = (msg: string, tone: 'ok' | 'err' = 'ok') => {
+    setToast({ msg, tone });
+    setTimeout(() => setToast(null), 3200);
+  };
+
+  // Runs an authenticated admin call, refreshing the token once on 401. A
+  // failed refresh logs the admin out.
+  async function call<T>(fn: (token: string) => Promise<T>): Promise<T> {
+    try {
+      return await fn(session.accessToken);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401 && session.refreshToken) {
+        try {
+          const next = await adminRefresh(session.refreshToken, session.email);
+          setSession(next);
+          return await fn(next.accessToken);
+        } catch {
+          onLogout();
+        }
+      }
+      throw err;
+    }
+  }
+
+  const NAV: { id: Tab; label: string; Icon: typeof BarChart3 }[] = [
+    { id: 'dashboard', label: 'Dashboard', Icon: BarChart3 },
+    { id: 'users', label: 'Users', Icon: Users },
+    { id: 'monetization', label: 'Monetization', Icon: Crown },
+    { id: 'watermark', label: 'Watermark', Icon: Droplet },
+    { id: 'scripts', label: 'Scripts', Icon: Code2 },
+    { id: 'audit', label: 'Audit log', Icon: Activity },
+  ];
+
+  return (
+    <div className="min-h-screen flex bg-zinc-100 text-zinc-900 font-ui">
+      {/* sidebar */}
+      <aside className="w-60 shrink-0 bg-zinc-950 text-zinc-300 flex flex-col">
+        <div className="h-16 flex items-center gap-2.5 px-5 border-b border-white/5">
+          <span className="grid place-items-center w-8 h-8 rounded-lg bg-accent text-white">
+            <Shield size={16} strokeWidth={2.2} />
+          </span>
+          <span className="font-bold text-[14px] text-white">Backoffice</span>
+        </div>
+        <nav className="flex-1 p-3 space-y-1">
+          {NAV.map(({ id, label, Icon }) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              className={
+                'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] transition text-left ' +
+                (tab === id ? 'bg-accent text-white font-semibold' : 'hover:bg-white/5')
+              }
+            >
+              <Icon size={16} /> {label}
+            </button>
+          ))}
+        </nav>
+        <div className="p-3 border-t border-white/5">
+          <div className="px-3 pb-2 text-[11px] text-zinc-500 truncate">{session.email}</div>
+          <button
+            onClick={onLogout}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] text-zinc-300 hover:bg-white/5 transition text-left"
+          >
+            <LogOut size={16} /> Sign out
+          </button>
+        </div>
+      </aside>
+
+      {/* content */}
+      <main className="flex-1 overflow-y-auto">
+        <div className="max-w-5xl mx-auto p-7">
+          {tab === 'dashboard' && <DashboardTab call={call} />}
+          {tab === 'users' && <UsersTab call={call} flash={flash} />}
+          {tab === 'monetization' && <MonetizationTab call={call} flash={flash} />}
+          {tab === 'watermark' && <WatermarkTab call={call} flash={flash} />}
+          {tab === 'scripts' && <ScriptsTab call={call} flash={flash} />}
+          {tab === 'audit' && <AuditTab call={call} />}
+        </div>
+      </main>
+
+      {toast && (
+        <div
+          className={
+            'fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-2xl text-[13px] font-medium text-white ' +
+            (toast.tone === 'ok' ? 'bg-emerald-600' : 'bg-red-600')
+          }
+        >
+          {toast.msg}
+        </div>
+      )}
+    </div>
+  );
+}
+
+type Caller = <T>(fn: (token: string) => Promise<T>) => Promise<T>;
+type Flash = (msg: string, tone?: 'ok' | 'err') => void;
+
+/* ====================================================================== */
+/*  Dashboard                                                             */
+/* ====================================================================== */
+function DashboardTab({ call }: { call: Caller }) {
+  const [metrics, setMetrics] = useState<AdminMetrics | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = () => {
+    setLoading(true);
+    call(adminGetMetrics)
+      .then(setMetrics)
+      .catch(() => setMetrics(null))
+      .finally(() => setLoading(false));
+  };
+  useEffect(load, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const cards = metrics
+    ? [
+        { label: 'Total users', value: metrics.totalUsers },
+        { label: 'Pro subscribers', value: metrics.proUsers },
+        { label: 'Free users', value: metrics.freeUsers },
+        { label: 'New (7 days)', value: metrics.newUsers7d },
+        { label: 'New (30 days)', value: metrics.newUsers30d },
+        { label: 'Saved cards', value: metrics.totalCards },
+        { label: 'Total exports', value: metrics.totalExports },
+        { label: 'Free exports used', value: metrics.freeExportsUsed },
+      ]
+    : [];
+
+  return (
+    <div>
+      <Header title="Dashboard" subtitle="Usage at a glance" onRefresh={load} />
+      {loading ? (
+        <Spinner />
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {cards.map((c) => (
+            <div key={c.label} className="bg-white rounded-xl border border-zinc-200 p-5">
+              <div className="text-[12px] text-zinc-500">{c.label}</div>
+              <div className="text-[26px] font-bold tracking-tight mt-1 tabular-nums">{c.value}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ====================================================================== */
+/*  Users                                                                 */
+/* ====================================================================== */
+const STATUSES = ['free', 'active', 'canceled', 'past_due'];
+
+function UsersTab({ call, flash }: { call: Caller; flash: Flash }) {
+  const [search, setSearch] = useState('');
+  const [items, setItems] = useState<AdminUser[]>([]);
+  const [total, setTotal] = useState(0);
+  const [skip, setSkip] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState<AdminUser | null>(null);
+  const take = 25;
+
+  const load = () => {
+    setLoading(true);
+    call((t) => adminListUsers(t, search, skip, take))
+      .then((r) => {
+        setItems(r.items);
+        setTotal(r.total);
+      })
+      .catch(() => flash('Could not load users', 'err'))
+      .finally(() => setLoading(false));
+  };
+  useEffect(load, [skip]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const onSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSkip(0);
+    load();
+  };
+
+  const remove = async (u: AdminUser) => {
+    if (!confirm(`Delete ${u.email}? This cannot be undone.`)) return;
+    try {
+      await call((t) => adminDeleteUser(t, u.id));
+      flash('User deleted');
+      load();
+    } catch (err) {
+      flash(err instanceof ApiError ? err.message : 'Delete failed', 'err');
+    }
+  };
+
+  return (
+    <div>
+      <Header title="Users" subtitle={`${total} total`} onRefresh={load} />
+
+      <form onSubmit={onSearch} className="flex gap-2 mb-4">
+        <div className="relative flex-1 max-w-sm">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by email…"
+            className="w-full rounded-lg border border-zinc-200 bg-white pl-9 pr-3 py-2 text-[13px] outline-none focus:border-accent"
+          />
+        </div>
+        <button className="px-4 rounded-lg bg-zinc-900 text-white text-[13px] font-semibold">Search</button>
+      </form>
+
+      {loading ? (
+        <Spinner />
+      ) : (
+        <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
+          <table className="w-full text-[13px]">
+            <thead className="bg-zinc-50 text-zinc-500 text-[11.5px] uppercase tracking-wide">
+              <tr>
+                <th className="text-left font-semibold px-4 py-2.5">Email</th>
+                <th className="text-left font-semibold px-4 py-2.5">Plan</th>
+                <th className="text-right font-semibold px-4 py-2.5">Free used</th>
+                <th className="text-right font-semibold px-4 py-2.5">Exports</th>
+                <th className="text-left font-semibold px-4 py-2.5">Joined</th>
+                <th className="px-4 py-2.5"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((u) => (
+                <tr key={u.id} className="border-t border-zinc-100">
+                  <td className="px-4 py-2.5">
+                    <span className="font-medium">{u.email}</span>
+                    {u.isAdmin && <span className="ml-2 text-[10px] text-accent font-bold">ADMIN</span>}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <PlanBadge status={u.subscriptionStatus} />
+                  </td>
+                  <td className="px-4 py-2.5 text-right tabular-nums">{u.freeExportsUsed}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums">{u.totalExports}</td>
+                  <td className="px-4 py-2.5 text-zinc-500">{new Date(u.createdAt).toLocaleDateString()}</td>
+                  <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                    <button
+                      onClick={() => setEditing(u)}
+                      className="text-[12px] font-semibold text-accent hover:underline mr-3"
+                    >
+                      Edit
+                    </button>
+                    {!u.isAdmin && (
+                      <button onClick={() => remove(u)} className="text-zinc-400 hover:text-red-600">
+                        <Trash2 size={15} />
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {items.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-10 text-center text-zinc-400">
+                    No users found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {total > take && (
+        <div className="flex items-center justify-between mt-3 text-[12.5px] text-zinc-500">
+          <span>
+            {skip + 1}–{Math.min(skip + take, total)} of {total}
+          </span>
+          <div className="flex gap-2">
+            <button
+              disabled={skip === 0}
+              onClick={() => setSkip(Math.max(0, skip - take))}
+              className="px-3 py-1.5 rounded-lg border border-zinc-200 bg-white disabled:opacity-40"
+            >
+              Prev
+            </button>
+            <button
+              disabled={skip + take >= total}
+              onClick={() => setSkip(skip + take)}
+              className="px-3 py-1.5 rounded-lg border border-zinc-200 bg-white disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+
+      {editing && (
+        <EditUserModal
+          user={editing}
+          call={call}
+          flash={flash}
+          onClose={() => setEditing(null)}
+          onSaved={(u) => {
+            setItems((prev) => prev.map((x) => (x.id === u.id ? u : x)));
+            setEditing(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function PlanBadge({ status }: { status: string }) {
+  const pro = status === 'active';
+  return (
+    <span
+      className={
+        'inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold ' +
+        (pro ? 'bg-amber-100 text-amber-700' : 'bg-zinc-100 text-zinc-600')
+      }
+    >
+      {status}
+    </span>
+  );
+}
+
+function EditUserModal({
+  user,
+  call,
+  flash,
+  onClose,
+  onSaved,
+}: {
+  user: AdminUser;
+  call: Caller;
+  flash: Flash;
+  onClose: () => void;
+  onSaved: (u: AdminUser) => void;
+}) {
+  const [status, setStatus] = useState(user.subscriptionStatus);
+  const [freeUsed, setFreeUsed] = useState(user.freeExportsUsed);
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const updated = await call((t) =>
+        adminUpdateUser(t, user.id, { subscriptionStatus: status, freeExportsUsed: freeUsed }),
+      );
+      flash('User updated');
+      onSaved(updated);
+    } catch {
+      flash('Update failed', 'err');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" onClick={onClose}>
+      <div className="w-full max-w-[380px] bg-white rounded-2xl shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="font-bold text-[15px] mb-1">Edit user</div>
+        <div className="text-[12.5px] text-zinc-500 mb-5 truncate">{user.email}</div>
+
+        <label className="block text-[12px] text-zinc-500 mb-1">Subscription status</label>
+        <select
+          value={status}
+          onChange={(e) => setStatus(e.target.value)}
+          className="w-full mb-4 rounded-lg border border-zinc-200 px-3 py-2 text-[13px] outline-none focus:border-accent"
+        >
+          {STATUSES.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+
+        <label className="block text-[12px] text-zinc-500 mb-1">Free exports used</label>
+        <input
+          type="number"
+          min={0}
+          value={freeUsed}
+          onChange={(e) => setFreeUsed(Math.max(0, Number(e.target.value)))}
+          className="w-full mb-2 rounded-lg border border-zinc-200 px-3 py-2 text-[13px] outline-none focus:border-accent"
+        />
+        <button onClick={() => setFreeUsed(0)} className="text-[12px] text-accent hover:underline mb-5">
+          Reset to 0
+        </button>
+
+        <div className="flex gap-2">
+          <button onClick={onClose} className="flex-1 h-10 rounded-lg border border-zinc-200 text-[13px] font-semibold">
+            Cancel
+          </button>
+          <button
+            onClick={save}
+            disabled={saving}
+            className="flex-1 h-10 rounded-lg bg-zinc-900 text-white text-[13px] font-semibold flex items-center justify-center gap-2 disabled:opacity-60"
+          >
+            {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Save
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ====================================================================== */
+/*  Settings (shared loader for monetization / watermark / scripts)       */
+/* ====================================================================== */
+function useSettings(call: Caller) {
+  const [settings, setSettings] = useState<AdminSettings | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    call(adminGetSettings)
+      .then(setSettings)
+      .catch(() => setSettings(null))
+      .finally(() => setLoading(false));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return { settings, setSettings, loading };
+}
+
+async function persist(
+  call: Caller,
+  flash: Flash,
+  next: AdminSettings,
+  setSettings: (s: AdminSettings) => void,
+  setSaving: (b: boolean) => void,
+) {
+  setSaving(true);
+  try {
+    const saved = await call((t) => adminPutSettings(t, next));
+    setSettings(saved);
+    flash('Settings saved');
+  } catch {
+    flash('Save failed', 'err');
+  } finally {
+    setSaving(false);
+  }
+}
+
+function MonetizationTab({ call, flash }: { call: Caller; flash: Flash }) {
+  const { settings, setSettings, loading } = useSettings(call);
+  const [saving, setSaving] = useState(false);
+  if (loading || !settings) return loading ? <Spinner /> : <LoadError />;
+
+  const set = (patch: Partial<AdminSettings>) => setSettings({ ...settings, ...patch });
+
+  return (
+    <div>
+      <Header title="Monetization" subtitle="Plans, limits, pricing & upgrade copy" />
+      <Panel>
+        <NumberField
+          label="Free export limit"
+          hint="Lifetime free exports per account before the upgrade prompt."
+          value={settings.freeExportLimit}
+          onChange={(v) => set({ freeExportLimit: v })}
+        />
+        <TextField
+          label="Pro price label"
+          hint="Displayed on the upgrade button (cosmetic; actual price is in Stripe)."
+          value={settings.proPriceLabel}
+          onChange={(v) => set({ proPriceLabel: v })}
+        />
+        <TextField
+          label="Upgrade title"
+          value={settings.upgradeTitle}
+          onChange={(v) => set({ upgradeTitle: v })}
+        />
+        <TextField
+          label="Upgrade subtitle"
+          value={settings.upgradeSubtitle}
+          onChange={(v) => set({ upgradeSubtitle: v })}
+        />
+        <TextAreaField
+          label="Pro features (one per line)"
+          value={settings.proFeatures.join('\n')}
+          rows={4}
+          onChange={(v) => set({ proFeatures: v.split('\n').map((s) => s.trim()).filter(Boolean) })}
+        />
+        <SaveBar saving={saving} onSave={() => persist(call, flash, settings, setSettings, setSaving)} />
+      </Panel>
+    </div>
+  );
+}
+
+function WatermarkTab({ call, flash }: { call: Caller; flash: Flash }) {
+  const { settings, setSettings, loading } = useSettings(call);
+  const [saving, setSaving] = useState(false);
+  if (loading || !settings) return loading ? <Spinner /> : <LoadError />;
+
+  const set = (patch: Partial<AdminSettings>) => setSettings({ ...settings, ...patch });
+
+  return (
+    <div>
+      <Header title="Watermark" subtitle="Applied to free-plan exports only" />
+      <Panel>
+        <label className="flex items-center gap-3 mb-5 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={settings.watermarkEnabled}
+            onChange={(e) => set({ watermarkEnabled: e.target.checked })}
+            className="w-4 h-4 accent-[#6d5efc]"
+          />
+          <span className="text-[13px] font-medium">Enable watermark on free-plan images</span>
+        </label>
+        <TextField
+          label="Watermark text"
+          value={settings.watermarkText}
+          onChange={(v) => set({ watermarkText: v })}
+        />
+        <SaveBar saving={saving} onSave={() => persist(call, flash, settings, setSettings, setSaving)} />
+      </Panel>
+    </div>
+  );
+}
+
+function ScriptsTab({ call, flash }: { call: Caller; flash: Flash }) {
+  const { settings, setSettings, loading } = useSettings(call);
+  const [saving, setSaving] = useState(false);
+  if (loading || !settings) return loading ? <Spinner /> : <LoadError />;
+
+  const set = (patch: Partial<AdminSettings>) => setSettings({ ...settings, ...patch });
+
+  return (
+    <div>
+      <Header title="Scripts" subtitle="Third-party tags (GTM, GA, Meta Pixel, Hotjar, …)" />
+      <Panel>
+        <div className="mb-4 text-[12px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          These are injected verbatim into every page. Only paste code from sources you trust.
+        </div>
+        <TextAreaField
+          label="<head> scripts"
+          hint="Injected into the document head."
+          value={settings.headScripts}
+          rows={6}
+          mono
+          onChange={(v) => set({ headScripts: v })}
+        />
+        <TextAreaField
+          label="end of <body> scripts"
+          hint="Injected just before </body>."
+          value={settings.bodyScripts}
+          rows={6}
+          mono
+          onChange={(v) => set({ bodyScripts: v })}
+        />
+        <SaveBar saving={saving} onSave={() => persist(call, flash, settings, setSettings, setSaving)} />
+      </Panel>
+    </div>
+  );
+}
+
+/* ====================================================================== */
+/*  Audit                                                                 */
+/* ====================================================================== */
+function AuditTab({ call }: { call: Caller }) {
+  const [items, setItems] = useState<AuditLogItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = () => {
+    setLoading(true);
+    call((t) => adminGetAudit(t, 0, 100))
+      .then((r) => setItems(r.items))
+      .catch(() => setItems([]))
+      .finally(() => setLoading(false));
+  };
+  useEffect(load, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div>
+      <Header title="Audit log" subtitle="Recent backoffice activity" onRefresh={load} />
+      {loading ? (
+        <Spinner />
+      ) : (
+        <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
+          <table className="w-full text-[13px]">
+            <thead className="bg-zinc-50 text-zinc-500 text-[11.5px] uppercase tracking-wide">
+              <tr>
+                <th className="text-left font-semibold px-4 py-2.5">When</th>
+                <th className="text-left font-semibold px-4 py-2.5">Actor</th>
+                <th className="text-left font-semibold px-4 py-2.5">Action</th>
+                <th className="text-left font-semibold px-4 py-2.5">Details</th>
+                <th className="text-left font-semibold px-4 py-2.5">IP</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((a) => (
+                <tr key={a.id} className="border-t border-zinc-100">
+                  <td className="px-4 py-2.5 text-zinc-500 whitespace-nowrap">
+                    {new Date(a.timestampUtc).toLocaleString()}
+                  </td>
+                  <td className="px-4 py-2.5">{a.actorEmail}</td>
+                  <td className="px-4 py-2.5 font-mono text-[12px]">{a.action}</td>
+                  <td className="px-4 py-2.5 text-zinc-600">{a.details}</td>
+                  <td className="px-4 py-2.5 text-zinc-400 font-mono text-[12px]">{a.ipAddress}</td>
+                </tr>
+              ))}
+              {items.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-10 text-center text-zinc-400">
+                    No activity yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ====================================================================== */
+/*  Shared UI bits                                                        */
+/* ====================================================================== */
+function Header({ title, subtitle, onRefresh }: { title: string; subtitle?: string; onRefresh?: () => void }) {
+  return (
+    <div className="flex items-center justify-between mb-5">
+      <div>
+        <h1 className="text-[20px] font-bold tracking-tight">{title}</h1>
+        {subtitle && <p className="text-[13px] text-zinc-500 mt-0.5">{subtitle}</p>}
+      </div>
+      {onRefresh && (
+        <button
+          onClick={onRefresh}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-200 bg-white text-[12.5px] font-medium hover:border-zinc-300"
+        >
+          <RefreshCw size={14} /> Refresh
+        </button>
+      )}
+    </div>
+  );
+}
+
+function Panel({ children }: { children: React.ReactNode }) {
+  return <div className="bg-white rounded-xl border border-zinc-200 p-6 max-w-2xl">{children}</div>;
+}
+
+function Spinner() {
+  return (
+    <div className="grid place-items-center py-20 text-zinc-400">
+      <Loader2 size={24} className="animate-spin" />
+    </div>
+  );
+}
+
+function LoadError() {
+  return <div className="text-[13px] text-red-600 py-10">Could not load settings.</div>;
+}
+
+function SaveBar({ saving, onSave }: { saving: boolean; onSave: () => void }) {
+  return (
+    <div className="mt-6 pt-5 border-t border-zinc-100">
+      <button
+        onClick={onSave}
+        disabled={saving}
+        className="flex items-center gap-2 px-5 h-11 rounded-lg bg-zinc-900 text-white text-[13.5px] font-semibold disabled:opacity-60"
+      >
+        {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Save changes
+      </button>
+    </div>
+  );
+}
+
+function TextField({
+  label,
+  hint,
+  value,
+  onChange,
+}: {
+  label: string;
+  hint?: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="mb-4">
+      <label className="block text-[12.5px] font-medium text-zinc-700 mb-1">{label}</label>
+      {hint && <p className="text-[11.5px] text-zinc-400 mb-1.5">{hint}</p>}
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-[13px] outline-none focus:border-accent"
+      />
+    </div>
+  );
+}
+
+function NumberField({
+  label,
+  hint,
+  value,
+  onChange,
+}: {
+  label: string;
+  hint?: string;
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <div className="mb-4">
+      <label className="block text-[12.5px] font-medium text-zinc-700 mb-1">{label}</label>
+      {hint && <p className="text-[11.5px] text-zinc-400 mb-1.5">{hint}</p>}
+      <input
+        type="number"
+        min={0}
+        value={value}
+        onChange={(e) => onChange(Math.max(0, Number(e.target.value)))}
+        className="w-40 rounded-lg border border-zinc-200 px-3 py-2 text-[13px] outline-none focus:border-accent"
+      />
+    </div>
+  );
+}
+
+function TextAreaField({
+  label,
+  hint,
+  value,
+  rows,
+  mono,
+  onChange,
+}: {
+  label: string;
+  hint?: string;
+  value: string;
+  rows: number;
+  mono?: boolean;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="mb-4">
+      <label className="block text-[12.5px] font-medium text-zinc-700 mb-1">{label}</label>
+      {hint && <p className="text-[11.5px] text-zinc-400 mb-1.5">{hint}</p>}
+      <textarea
+        value={value}
+        rows={rows}
+        onChange={(e) => onChange(e.target.value)}
+        className={
+          'w-full rounded-lg border border-zinc-200 px-3 py-2 text-[13px] outline-none focus:border-accent resize-y ' +
+          (mono ? 'font-mono text-[12px]' : '')
+        }
+      />
+    </div>
+  );
+}

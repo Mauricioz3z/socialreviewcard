@@ -34,12 +34,14 @@ import {
   claimExport,
   deleteCard,
   getCards,
+  getConfig,
   getUsage,
   loadSession,
   refresh,
   saveCard,
   saveSession,
   startCheckout,
+  type PublicConfig,
   type UsageInfo,
 } from './lib/api';
 import type {
@@ -58,6 +60,36 @@ interface ToastState {
   title: string;
   desc: string;
   tone: 'success' | 'error';
+}
+
+/**
+ * Injects operator-supplied HTML/JS (GTM, GA, Meta Pixel, Hotjar, …) into the
+ * <head> or <body>. <script> tags set via innerHTML don't execute, so they're
+ * recreated as real script elements. Guarded against double-injection.
+ */
+function injectScripts(slot: 'head' | 'body', html: string) {
+  if (!html || !html.trim()) return;
+  const marker = `data-injected-${slot}`;
+  if (document.querySelector(`[${marker}]`)) return;
+
+  const holder = document.createElement('div');
+  holder.innerHTML = html;
+  const target = slot === 'head' ? document.head : document.body;
+
+  Array.from(holder.childNodes).forEach((node) => {
+    if (node.nodeName === 'SCRIPT') {
+      const orig = node as HTMLScriptElement;
+      const s = document.createElement('script');
+      Array.from(orig.attributes).forEach((a) => s.setAttribute(a.name, a.value));
+      s.text = orig.text;
+      s.setAttribute(marker, '');
+      target.appendChild(s);
+    } else {
+      const el = node.cloneNode(true);
+      if (el instanceof HTMLElement) el.setAttribute(marker, '');
+      target.appendChild(el);
+    }
+  });
 }
 
 export default function App() {
@@ -89,6 +121,7 @@ export default function App() {
   const [upgrading, setUpgrading] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [usage, setUsage] = useState<UsageInfo | null>(null);
+  const [config, setConfig] = useState<PublicConfig | null>(null);
 
   const captureRef = useRef<HTMLDivElement>(null);
 
@@ -97,6 +130,10 @@ export default function App() {
   const data: CardData = { review, name, platform, rating, avatar, cardStyle, font, ratio };
   const styles = { avatar, cardStyle, font, ratio, background: bgId, grain };
 
+  // Free-plan exports get a watermark; Pro accounts never do.
+  const watermark =
+    config?.watermarkEnabled && !usage?.isPro ? config.watermarkText : null;
+
   const showToast = (title: string, desc: string, tone: 'success' | 'error' = 'success') =>
     setToast({ id: Date.now(), title, desc, tone });
 
@@ -104,6 +141,24 @@ export default function App() {
   useEffect(() => {
     saveSession(session);
   }, [session]);
+
+  /* ----------------- runtime config + third-party scripts ----------------- */
+  useEffect(() => {
+    let cancelled = false;
+    getConfig()
+      .then((c) => {
+        if (cancelled) return;
+        setConfig(c);
+        injectScripts('head', c.headScripts);
+        injectScripts('body', c.bodyScripts);
+      })
+      .catch(() => {
+        /* config is best-effort; the app works with built-in defaults */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Detect a return from Stripe Checkout and confirm Pro state by polling the
   // backend (the webhook that flips the subscription may land a moment later).
@@ -669,12 +724,12 @@ export default function App() {
           }}
         />
 
-        <Preview data={data} bg={bg} grain={grain} />
+        <Preview data={data} bg={bg} grain={grain} watermark={watermark} />
       </main>
 
       {/* hidden full-res node used purely for the image export */}
       <div style={{ position: 'fixed', left: -100000, top: 0, pointerEvents: 'none' }} aria-hidden>
-        <CardCanvas ref={captureRef} data={data} bg={bg} grain={grain} />
+        <CardCanvas ref={captureRef} data={data} bg={bg} grain={grain} watermark={watermark} />
       </div>
 
       {/* ============ SAVED CARDS DRAWER ============ */}
@@ -695,6 +750,7 @@ export default function App() {
           onClose={() => setShowUpgrade(false)}
           onUpgrade={onUpgrade}
           upgrading={upgrading}
+          config={config}
         />
       )}
 
@@ -759,16 +815,24 @@ function UpgradeModal({
   onClose,
   onUpgrade,
   upgrading,
+  config,
 }: {
   onClose: () => void;
   onUpgrade: () => void;
   upgrading: boolean;
+  config: PublicConfig | null;
 }) {
-  const perks = [
-    'Unlimited high-resolution exports',
-    'No watermark on your cards',
-    'Every premium template & background',
-  ];
+  const title = config?.upgradeTitle || "You're out of free exports";
+  const subtitle = config?.upgradeSubtitle || 'Upgrade to ReviewCraft Pro to keep exporting';
+  const priceLabel = config?.proPriceLabel || '$1.99/mo';
+  const perks =
+    config?.proFeatures && config.proFeatures.length > 0
+      ? config.proFeatures
+      : [
+          'Unlimited high-resolution exports',
+          'No watermark on your cards',
+          'Every premium template & background',
+        ];
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-black/40 backdrop-blur-sm p-4">
       <div className="w-full max-w-[400px] bg-white rounded-2xl shadow-2xl ring-1 ring-black/5 overflow-hidden font-ui">
@@ -779,10 +843,10 @@ function UpgradeModal({
             </span>
             <div>
               <div className="font-bold text-[15px] tracking-tight leading-none">
-                You're out of free exports
+                {title}
               </div>
               <div className="text-[12px] text-zinc-400 mt-1">
-                Upgrade to ReviewCraft Pro to keep exporting
+                {subtitle}
               </div>
             </div>
           </div>
@@ -812,7 +876,7 @@ function UpgradeModal({
             ) : (
               <Crown size={18} strokeWidth={2.2} />
             )}
-            Upgrade to Pro · $1.99/mo
+            Upgrade to Pro · {priceLabel}
           </button>
           <button
             onClick={onClose}

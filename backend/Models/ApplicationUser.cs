@@ -25,10 +25,19 @@ public class ApplicationUser : IdentityUser
     public DateTime? SubscriptionEndDate { get; set; }
 
     /// <summary>
-    /// Lifetime number of image exports (PNG generations) the user has consumed.
-    /// Free accounts are capped (see UsageEndpoints); Pro accounts are unlimited.
+    /// Number of free-quota image exports the user has consumed. Counts toward the
+    /// free cap (see UsageEndpoints); not incremented for Pro accounts.
     /// </summary>
     public int FreeExportsUsed { get; set; }
+
+    /// <summary>
+    /// Lifetime number of image exports across all plans (free + Pro), used for
+    /// admin/dashboard metrics. Incremented on every successful export.
+    /// </summary>
+    public int TotalExports { get; set; }
+
+    /// <summary>When the account was created (used for signup metrics).</summary>
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     /// <summary>
     /// Cards authored by this user.

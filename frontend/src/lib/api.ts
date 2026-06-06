@@ -106,6 +106,25 @@ export async function refresh(refreshToken: string, email: string): Promise<Auth
   return { accessToken: data.accessToken, refreshToken: data.refreshToken, email };
 }
 
+/* ----------------------------- Public config ----------------------------- */
+
+export interface PublicConfig {
+  freeExportLimit: number;
+  proPriceLabel: string;
+  proFeatures: string[];
+  upgradeTitle: string;
+  upgradeSubtitle: string;
+  watermarkEnabled: boolean;
+  watermarkText: string;
+  headScripts: string;
+  bodyScripts: string;
+}
+
+/** Anonymous runtime config (scripts, watermark, monetization copy). */
+export function getConfig(): Promise<PublicConfig> {
+  return request<PublicConfig>('/api/config', { method: 'GET' });
+}
+
 /* ----------------------------- Cards ----------------------------- */
 
 export function getCards(token: string): Promise<SavedCard[]> {

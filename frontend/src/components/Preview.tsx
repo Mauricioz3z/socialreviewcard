@@ -7,13 +7,41 @@ interface CanvasProps {
   data: CardData;
   bg: BackgroundConfig;
   grain: boolean;
+  /** When set, stamps a repeating diagonal watermark (free plan). */
+  watermark?: string | null;
+}
+
+const escapeXml = (s: string) =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/**
+ * Repeating diagonal watermark covering the whole canvas. The tile is horizontal
+ * text; the oversized layer is rotated so it reads as diagonal rows, and the
+ * card's overflow:hidden clips it — making it hard to crop out cleanly.
+ */
+function Watermark({ text }: { text: string }) {
+  const tile = `<svg xmlns='http://www.w3.org/2000/svg' width='300' height='92'><text x='8' y='56' font-family='Arial, Helvetica, sans-serif' font-size='17' font-weight='700' fill='white'>${escapeXml(text)}</text></svg>`;
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden>
+      <div
+        style={{
+          position: 'absolute',
+          inset: '-60%',
+          transform: 'rotate(-30deg)',
+          backgroundRepeat: 'repeat',
+          backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(tile)}")`,
+          opacity: 0.13,
+        }}
+      />
+    </div>
+  );
 }
 
 /**
  * The full-resolution card canvas (background + blooms + grain + card) rendered
  * at its natural pixel dimensions with no transform — ideal for image export.
  */
-export const CardCanvas = forwardRef<HTMLDivElement, CanvasProps>(({ data, bg, grain }, ref) => {
+export const CardCanvas = forwardRef<HTMLDivElement, CanvasProps>(({ data, bg, grain, watermark }, ref) => {
   const ratio = RATIOS[data.ratio];
   const inset = data.ratio === 'square' ? 30 : 28;
 
@@ -68,6 +96,7 @@ export const CardCanvas = forwardRef<HTMLDivElement, CanvasProps>(({ data, bg, g
       <div className="absolute" style={{ inset }}>
         <ReviewCard data={data} />
       </div>
+      {watermark && <Watermark text={watermark} />}
     </div>
   );
 });
@@ -75,7 +104,7 @@ export const CardCanvas = forwardRef<HTMLDivElement, CanvasProps>(({ data, bg, g
 CardCanvas.displayName = 'CardCanvas';
 
 /** Scales the card canvas to fit the available preview area. */
-export function Preview({ data, bg, grain }: CanvasProps) {
+export function Preview({ data, bg, grain, watermark }: CanvasProps) {
   const ratio = RATIOS[data.ratio];
   const wrapRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -101,7 +130,7 @@ export function Preview({ data, bg, grain }: CanvasProps) {
     <div ref={wrapRef} className="relative flex-1 grid place-items-center overflow-hidden">
       <div style={{ width: ratio.w * scale, height: ratio.h * scale }}>
         <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}>
-          <CardCanvas data={data} bg={bg} grain={grain} />
+          <CardCanvas data={data} bg={bg} grain={grain} watermark={watermark} />
         </div>
       </div>
     </div>

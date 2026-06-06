@@ -43,15 +43,22 @@ builder.Services
         options.Password.RequiredLength = 8;
         options.SignIn.RequireConfirmedEmail = false;
     })
+    .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>();
 
 // Identity API endpoints emit a bearer token by default; cookies are also
-// available for browser sessions. Authorization is enabled for [Authorize]/RequireAuthorization.
-builder.Services.AddAuthorization();
+// available for browser sessions. The "Admin" policy gates the backoffice.
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy(AdminEndpoints.AdminRole, p => p.RequireRole(AdminEndpoints.AdminRole));
+});
 
 // Stripe configuration + service.
 builder.Services.Configure<StripeOptions>(builder.Configuration.GetSection(StripeOptions.SectionName));
 builder.Services.AddScoped<IStripeService, StripeService>();
+
+// Audit logging for backoffice actions.
+builder.Services.AddScoped<IAuditLogger, AuditLogger>();
 
 // Clock abstraction used by the bearer-token refresh endpoint.
 builder.Services.AddSingleton(TimeProvider.System);
@@ -65,8 +72,36 @@ var app = builder.Build();
 // ----------------------------------------------------------------------------
 using (var scope = app.Services.CreateScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    var services = scope.ServiceProvider;
+    var db = services.GetRequiredService<ApplicationDbContext>();
     db.Database.Migrate();
+
+    // Ensure the Admin role exists and seed the admin account from configuration.
+    var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
+    if (!await roleManager.RoleExistsAsync(AdminEndpoints.AdminRole))
+        await roleManager.CreateAsync(new IdentityRole(AdminEndpoints.AdminRole));
+
+    var adminEmail = builder.Configuration["Admin:Email"];
+    var adminPassword = builder.Configuration["Admin:Password"];
+    if (!string.IsNullOrWhiteSpace(adminEmail) && !string.IsNullOrWhiteSpace(adminPassword))
+    {
+        var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
+        var admin = await userManager.FindByEmailAsync(adminEmail);
+        if (admin is null)
+        {
+            admin = new ApplicationUser { UserName = adminEmail, Email = adminEmail, EmailConfirmed = true };
+            var created = await userManager.CreateAsync(admin, adminPassword);
+            if (!created.Succeeded)
+                app.Logger.LogError("Failed to seed admin user: {Errors}",
+                    string.Join("; ", created.Errors.Select(e => e.Description)));
+        }
+        if (!await userManager.IsInRoleAsync(admin, AdminEndpoints.AdminRole))
+            await userManager.AddToRoleAsync(admin, AdminEndpoints.AdminRole);
+    }
+    else
+    {
+        app.Logger.LogWarning("Admin:Email / Admin:Password not configured — no admin account seeded.");
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -93,6 +128,10 @@ app.MapAuthEndpoints();
 app.MapCardEndpoints();
 app.MapBillingEndpoints();
 app.MapUsageEndpoints();
+
+// Public runtime config + admin backoffice.
+app.MapConfigEndpoints();
+app.MapAdminEndpoints();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" })).WithTags("System");
 
