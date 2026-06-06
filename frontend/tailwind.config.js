@@ -10,6 +10,10 @@ export default {
       },
       colors: {
         accent: { DEFAULT: '#6d5efc', hover: '#5b4cf0', soft: '#efedff' },
+        // Landing palette (Claude Design handoff)
+        cream: '#f6f3ec',
+        ink: { DEFAULT: '#1a1613', soft: '#6b6357' },
+        line: '#e6ddcd',
       },
       keyframes: {
         toastIn: {
