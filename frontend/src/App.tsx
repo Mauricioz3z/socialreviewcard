@@ -16,6 +16,7 @@ import {
   Palette,
   Quote,
   Save,
+  Share2,
   Smartphone,
   Sparkle,
   Square,
@@ -110,6 +111,7 @@ export default function App() {
 
   // ---- app state ----
   const [exporting, setExporting] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [session, setSession] = useState<AuthSession | null>(() => loadSession());
   const [showAuth, setShowAuth] = useState(false);
@@ -331,7 +333,42 @@ export default function App() {
     }
   };
 
-  /* ----------------------------- export ----------------------------- */
+  /* ----------------------------- export / share ----------------------------- */
+
+  const fileName = () => {
+    const safeName = (name || 'review').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '');
+    return `reviewcraft-${safeName || 'card'}-${RATIOS[ratio].dims.replace(':', 'x')}.png`;
+  };
+
+  // Rasterizes the hidden full-res node with the browser's own engine (SVG
+  // foreignObject) so fonts, letter-spacing and wrapping match the preview.
+  // Web fonts are awaited first or the export falls back to a wider system font.
+  const renderPng = async (): Promise<string> => {
+    const node = captureRef.current;
+    if (!node) throw new Error('Nothing to export');
+    if (document.fonts) {
+      await Promise.all([
+        document.fonts.load('600 31px "Plus Jakarta Sans"'),
+        document.fonts.load('700 16.5px "Plus Jakarta Sans"'),
+        document.fonts.load('500 31px "Newsreader"'),
+      ]).catch(() => {});
+      await document.fonts.ready;
+    }
+    return toPng(node, { pixelRatio: 2, cacheBust: true, width: node.offsetWidth, height: node.offsetHeight });
+  };
+
+  const downloadPng = (dataUrl: string) => {
+    const link = document.createElement('a');
+    link.download = fileName();
+    link.href = dataUrl;
+    link.click();
+  };
+
+  // True once the user is signed in but out of free exports. Callers open the
+  // upgrade popup instead of proceeding.
+  const outOfQuota = () =>
+    !!usage && !usage.isPro && usage.remaining !== null && usage.remaining <= 0;
+
   const doExport = async () => {
     if (exporting) return;
     if (!session) {
@@ -339,8 +376,7 @@ export default function App() {
       showToast('Sign in to export', 'Use your Google account — you get 3 free exports.', 'error');
       return;
     }
-    // Already known to be out of free exports — go straight to the upgrade popup.
-    if (usage && !usage.isPro && usage.remaining !== null && usage.remaining <= 0) {
+    if (outOfQuota()) {
       setShowUpgrade(true);
       return;
     }
@@ -350,39 +386,10 @@ export default function App() {
       const { ok, usage: u } = await withAuth(claimExport);
       setUsage(u);
       if (!ok) {
-        // No free exports left — open the upgrade popup instead of just a toast.
         setShowUpgrade(true);
         return;
       }
-
-      const node = captureRef.current;
-      if (!node) throw new Error('Nothing to export');
-
-      // Make sure the web fonts (Plus Jakarta Sans / Newsreader) are fully
-      // loaded before capturing — otherwise the export can fall back to a wider
-      // system font, which reflows the text and gets clipped by the card.
-      if (document.fonts) {
-        await Promise.all([
-          document.fonts.load('600 31px "Plus Jakarta Sans"'),
-          document.fonts.load('700 16.5px "Plus Jakarta Sans"'),
-          document.fonts.load('500 31px "Newsreader"'),
-        ]).catch(() => {});
-        await document.fonts.ready;
-      }
-
-      // Render with the browser's own engine (SVG foreignObject) so fonts,
-      // letter-spacing and line-wrapping match the on-screen preview exactly.
-      const dataUrl = await toPng(node, {
-        pixelRatio: 2,
-        cacheBust: true,
-        width: node.offsetWidth,
-        height: node.offsetHeight,
-      });
-      const link = document.createElement('a');
-      const safeName = (name || 'review').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '');
-      link.download = `reviewcraft-${safeName || 'card'}-${RATIOS[ratio].dims.replace(':', 'x')}.png`;
-      link.href = dataUrl;
-      link.click();
+      downloadPng(await renderPng());
       const left = u.isPro ? 'Unlimited exports' : `${u.remaining} free export(s) left`;
       showToast(`${RATIOS[ratio].label} image exported`, `Saved to downloads · ${left}`);
     } catch (err) {
@@ -394,6 +401,66 @@ export default function App() {
       }
     } finally {
       setExporting(false);
+    }
+  };
+
+  // Shares the image via the native share sheet (mobile → Instagram/Story,
+  // WhatsApp, etc.). On unsupported browsers (most desktops) it downloads the
+  // image so the user can upload it manually. The quota slot is only claimed on
+  // a completed action, so dismissing the share sheet doesn't burn a free export.
+  const doShare = async () => {
+    if (sharing) return;
+    if (!session) {
+      setShowAuth(true);
+      showToast('Sign in to share', 'Use your Google account — you get 3 free exports.', 'error');
+      return;
+    }
+    if (outOfQuota()) {
+      setShowUpgrade(true);
+      return;
+    }
+    setSharing(true);
+    try {
+      const dataUrl = await renderPng();
+      const blob = await (await fetch(dataUrl)).blob();
+      const file = new File([blob], fileName(), { type: 'image/png' });
+
+      const canShareFiles =
+        typeof navigator !== 'undefined' && !!navigator.canShare && navigator.canShare({ files: [file] });
+
+      if (canShareFiles) {
+        // Resolves once the user picks an app (or rejects with AbortError if they cancel).
+        await navigator.share({
+          files: [file],
+          title: 'My review card',
+          text: `${name || 'A customer'} review · made with SocialReviewCard.com`,
+        });
+        const { usage: u } = await withAuth(claimExport);
+        setUsage(u);
+        const left = u.isPro ? 'Unlimited exports' : `${u.remaining} free export(s) left`;
+        showToast('Ready to share', `Pick where to post · ${left}`);
+      } else {
+        // Desktop fallback: claim + download so they can upload it themselves.
+        const { ok, usage: u } = await withAuth(claimExport);
+        setUsage(u);
+        if (!ok) {
+          setShowUpgrade(true);
+          return;
+        }
+        downloadPng(dataUrl);
+        showToast('Saved for sharing', "This browser can't share files — image downloaded so you can upload it.");
+      }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        // User dismissed the native share sheet — no quota consumed, no error.
+      } else if (err instanceof ApiError && err.status === 401) {
+        setShowAuth(true);
+        showToast('Session expired', 'Sign in again to share.', 'error');
+      } else {
+        showToast('Share failed', 'We could not share the image. Try again.', 'error');
+      }
+    } finally {
+      setSharing(false);
     }
   };
 
@@ -642,6 +709,21 @@ export default function App() {
             ) : (
               <>
                 <Download size={18} strokeWidth={2.2} /> Export {RATIOS[ratio].dims} image
+              </>
+            )}
+          </button>
+          <button
+            onClick={doShare}
+            disabled={sharing}
+            className="w-full flex items-center justify-center gap-2 h-11 rounded-xl bg-accent text-white text-[13.5px] font-semibold transition-all hover:bg-accent-hover active:scale-[0.99] disabled:opacity-80"
+          >
+            {sharing ? (
+              <>
+                <Loader2 size={16} className="animate-spin" /> Preparing…
+              </>
+            ) : (
+              <>
+                <Share2 size={16} strokeWidth={2.2} /> Share to social
               </>
             )}
           </button>

@@ -23,6 +23,7 @@ function Watermark({ text }: { text: string }) {
   const tile = `<svg xmlns='http://www.w3.org/2000/svg' width='300' height='92'><text x='8' y='56' font-family='Arial, Helvetica, sans-serif' font-size='17' font-weight='700' fill='white'>${escapeXml(text)}</text></svg>`;
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden>
+      {/* subtle repeating diagonal */}
       <div
         style={{
           position: 'absolute',
@@ -33,6 +34,24 @@ function Watermark({ text }: { text: string }) {
           opacity: 0.13,
         }}
       />
+      {/* more visible footer credit so viewers know where it was made */}
+      <div style={{ position: 'absolute', bottom: 12, left: 0, right: 0, display: 'flex', justifyContent: 'center' }}>
+        <span
+          style={{
+            fontFamily: 'Arial, Helvetica, sans-serif',
+            fontSize: 11.5,
+            fontWeight: 700,
+            letterSpacing: 0.2,
+            color: 'rgba(255,255,255,0.95)',
+            background: 'rgba(0,0,0,0.36)',
+            padding: '4px 11px',
+            borderRadius: 999,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          Made with {text}
+        </span>
+      </div>
     </div>
   );
 }
