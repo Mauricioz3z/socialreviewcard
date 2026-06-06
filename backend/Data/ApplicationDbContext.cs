@@ -19,6 +19,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<PlatformSettings> PlatformSettings => Set<PlatformSettings>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<Feedback> Feedback => Set<Feedback>();
+    public DbSet<Platform> Platforms => Set<Platform>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -95,6 +96,22 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             entity.Property(f => f.Email).HasMaxLength(256);
             entity.Property(f => f.IpAddress).HasMaxLength(64);
             entity.HasIndex(f => f.CreatedAt);
+        });
+
+        builder.Entity<Platform>(entity =>
+        {
+            entity.HasKey(p => p.Id);
+            entity.Property(p => p.Label).IsRequired().HasMaxLength(40);
+            entity.Property(p => p.Color).IsRequired().HasMaxLength(20);
+            entity.Property(p => p.Icon).IsRequired().HasMaxLength(60);
+
+            // Seed the default platforms (FontAwesome brand icons).
+            entity.HasData(
+                new Platform { Id = 1, Label = "Etsy", Color = "#F1641E", Icon = "fab:etsy", SortOrder = 1, Enabled = true },
+                new Platform { Id = 2, Label = "Shopify", Color = "#5E8E3E", Icon = "fab:shopify", SortOrder = 2, Enabled = true },
+                new Platform { Id = 3, Label = "Amazon", Color = "#E88A1A", Icon = "fab:amazon", SortOrder = 3, Enabled = true },
+                new Platform { Id = 4, Label = "Instagram", Color = "#E1306C", Icon = "fab:instagram", SortOrder = 4, Enabled = true },
+                new Platform { Id = 5, Label = "Google", Color = "#4285F4", Icon = "fab:google", SortOrder = 5, Enabled = true });
         });
     }
 }

@@ -21,8 +21,18 @@ public static class ConfigEndpoints
             // Fall back to defaults if the row is somehow missing.
             s ??= new PlatformSettings();
 
+            var platforms = await db.Platforms.AsNoTracking()
+                .Where(p => p.Enabled)
+                .OrderBy(p => p.SortOrder)
+                .Select(p => new PlatformDto
+                {
+                    Id = p.Id, Label = p.Label, Color = p.Color, Icon = p.Icon, SortOrder = p.SortOrder, Enabled = p.Enabled,
+                })
+                .ToListAsync(ct);
+
             return Results.Ok(new PublicConfigResponse
             {
+                Platforms = platforms,
                 FreeExportLimit = s.FreeExportLimit,
                 ProPriceLabel = s.ProPriceLabel,
                 ProFeatures = ParseFeatures(s.ProFeaturesJson),

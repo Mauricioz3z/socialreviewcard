@@ -99,4 +99,5 @@ public class PublicConfigResponse
     public string WatermarkText { get; set; } = "";
     public string HeadScripts { get; set; } = "";
     public string BodyScripts { get; set; } = "";
+    public List<PlatformDto> Platforms { get; set; } = new();
 }

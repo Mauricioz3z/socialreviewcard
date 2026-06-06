@@ -252,6 +252,84 @@ public static class AdminEndpoints
             return Results.Ok(new { ok = true });
         });
 
+        // ---- Platforms CRUD ----
+        group.MapGet("/platforms", async (ApplicationDbContext db, CancellationToken ct) =>
+        {
+            var rows = await db.Platforms.AsNoTracking()
+                .OrderBy(p => p.SortOrder)
+                .Select(p => new PlatformDto
+                {
+                    Id = p.Id, Label = p.Label, Color = p.Color, Icon = p.Icon, SortOrder = p.SortOrder, Enabled = p.Enabled,
+                })
+                .ToListAsync(ct);
+            return Results.Ok(rows);
+        });
+
+        group.MapPost("/platforms", async (
+            [FromBody] PlatformUpsertRequest request,
+            ApplicationDbContext db,
+            IAuditLogger audit,
+            ClaimsPrincipal principal,
+            HttpContext http,
+            CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.Label))
+                return Results.BadRequest(new { error = "Label is required." });
+
+            var p = new Platform
+            {
+                Label = request.Label.Trim(),
+                Color = string.IsNullOrWhiteSpace(request.Color) ? "#6d5efc" : request.Color.Trim(),
+                Icon = string.IsNullOrWhiteSpace(request.Icon) ? "fas:store" : request.Icon.Trim(),
+                SortOrder = request.SortOrder,
+                Enabled = request.Enabled,
+            };
+            db.Platforms.Add(p);
+            await db.SaveChangesAsync(ct);
+            await audit.LogAsync(AdminEmail(principal), "platform.create", p.Label, ClientIp(http), ct);
+            return Results.Ok(new PlatformDto { Id = p.Id, Label = p.Label, Color = p.Color, Icon = p.Icon, SortOrder = p.SortOrder, Enabled = p.Enabled });
+        });
+
+        group.MapPut("/platforms/{id:int}", async (
+            int id,
+            [FromBody] PlatformUpsertRequest request,
+            ApplicationDbContext db,
+            IAuditLogger audit,
+            ClaimsPrincipal principal,
+            HttpContext http,
+            CancellationToken ct) =>
+        {
+            var p = await db.Platforms.FirstOrDefaultAsync(x => x.Id == id, ct);
+            if (p is null) return Results.NotFound();
+            if (string.IsNullOrWhiteSpace(request.Label))
+                return Results.BadRequest(new { error = "Label is required." });
+
+            p.Label = request.Label.Trim();
+            p.Color = string.IsNullOrWhiteSpace(request.Color) ? "#6d5efc" : request.Color.Trim();
+            p.Icon = string.IsNullOrWhiteSpace(request.Icon) ? "fas:store" : request.Icon.Trim();
+            p.SortOrder = request.SortOrder;
+            p.Enabled = request.Enabled;
+            await db.SaveChangesAsync(ct);
+            await audit.LogAsync(AdminEmail(principal), "platform.update", p.Label, ClientIp(http), ct);
+            return Results.Ok(new PlatformDto { Id = p.Id, Label = p.Label, Color = p.Color, Icon = p.Icon, SortOrder = p.SortOrder, Enabled = p.Enabled });
+        });
+
+        group.MapDelete("/platforms/{id:int}", async (
+            int id,
+            ApplicationDbContext db,
+            IAuditLogger audit,
+            ClaimsPrincipal principal,
+            HttpContext http,
+            CancellationToken ct) =>
+        {
+            var p = await db.Platforms.FirstOrDefaultAsync(x => x.Id == id, ct);
+            if (p is null) return Results.NotFound();
+            db.Platforms.Remove(p);
+            await db.SaveChangesAsync(ct);
+            await audit.LogAsync(AdminEmail(principal), "platform.delete", p.Label, ClientIp(http), ct);
+            return Results.NoContent();
+        });
+
         // GET /api/admin/audit?skip=&take=
         group.MapGet("/audit", async (ApplicationDbContext db, int skip, int take, CancellationToken ct) =>
         {
