@@ -87,15 +87,32 @@ using (var scope = app.Services.CreateScope())
     {
         var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
         var admin = await userManager.FindByEmailAsync(adminEmail);
+        var ok = true;
+
         if (admin is null)
         {
             admin = new ApplicationUser { UserName = adminEmail, Email = adminEmail, EmailConfirmed = true };
             var created = await userManager.CreateAsync(admin, adminPassword);
-            if (!created.Succeeded)
+            ok = created.Succeeded;
+            if (ok)
+                app.Logger.LogInformation("Seeded admin account {Email}.", adminEmail);
+            else
                 app.Logger.LogError("Failed to seed admin user: {Errors}",
                     string.Join("; ", created.Errors.Select(e => e.Description)));
         }
-        if (!await userManager.IsInRoleAsync(admin, AdminEndpoints.AdminRole))
+        else
+        {
+            // The configured password is the source of truth — reset it on every
+            // startup so changing the env var actually changes the login.
+            var token = await userManager.GeneratePasswordResetTokenAsync(admin);
+            var reset = await userManager.ResetPasswordAsync(admin, token, adminPassword);
+            ok = reset.Succeeded;
+            if (!ok)
+                app.Logger.LogError("Failed to update admin password: {Errors}",
+                    string.Join("; ", reset.Errors.Select(e => e.Description)));
+        }
+
+        if (ok && !await userManager.IsInRoleAsync(admin, AdminEndpoints.AdminRole))
             await userManager.AddToRoleAsync(admin, AdminEndpoints.AdminRole);
     }
     else
