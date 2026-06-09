@@ -3,6 +3,7 @@ import { toPng } from 'html-to-image';
 import {
   AtSign,
   Check,
+  Clapperboard,
   CircleUser,
   CaseUpper,
   Crown,
@@ -30,6 +31,7 @@ import {
 import { Preview, CardCanvas } from './components/Preview';
 import { Field, Section, Segmented, StyleSwatch, Toggle } from './components/ui';
 import { AuthModal } from './components/AuthModal';
+import { ReelModal } from './feature/reel/ReelModal';
 import { BACKGROUNDS, CARD_STYLES, DEFAULT_PLATFORMS, resolvePlatform, RATIOS } from './lib/config';
 import { PlatformIcon } from './lib/platformIcon';
 import {
@@ -132,6 +134,7 @@ export default function App() {
   const [config, setConfig] = useState<PublicConfig | null>(null);
   const [showMobilePreview, setShowMobilePreview] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [reelImageUrl, setReelImageUrl] = useState<string | null>(null);
 
   const captureRef = useRef<HTMLDivElement>(null);
 
@@ -491,6 +494,20 @@ export default function App() {
     }
   };
 
+  // Rasterize the current card and open the animated-video (Reel) studio.
+  const openReel = async () => {
+    if (!session) {
+      setShowAuth(true);
+      showToast('Sign in to animate', 'Use your Google account to export a video.', 'error');
+      return;
+    }
+    try {
+      setReelImageUrl(await renderPng());
+    } catch {
+      showToast('Could not prepare', 'We could not render the card. Try again.', 'error');
+    }
+  };
+
   return (
     <div className="h-full flex font-ui text-zinc-900">
       {/* ============ LEFT: CONTROL PANEL ============ */}
@@ -813,6 +830,13 @@ export default function App() {
             </p>
           )}
           <button
+            onClick={openReel}
+            className="w-full flex items-center justify-center gap-2 h-11 rounded-xl border border-accent/40 bg-accent-soft text-accent text-[13.5px] font-semibold transition-all hover:border-accent active:scale-[0.99]"
+          >
+            <Clapperboard size={16} strokeWidth={2.2} /> Animate to video
+            <span className="text-[10px] font-bold uppercase tracking-wide bg-accent text-white px-1.5 py-0.5 rounded">Beta</span>
+          </button>
+          <button
             onClick={onSave}
             disabled={saving}
             className="w-full flex items-center justify-center gap-2 h-11 rounded-xl border border-zinc-200 bg-white text-zinc-800 text-[13.5px] font-semibold transition-all hover:border-zinc-300 active:scale-[0.99] disabled:opacity-70"
@@ -959,6 +983,9 @@ export default function App() {
       {showFeedback && (
         <FeedbackModal session={session} onClose={() => setShowFeedback(false)} showToast={showToast} />
       )}
+
+      {/* ============ REEL (animated video) ============ */}
+      {reelImageUrl && <ReelModal cardImageUrl={reelImageUrl} onClose={() => setReelImageUrl(null)} />}
 
       {/* ============ TOAST ============ */}
       {toast && (
