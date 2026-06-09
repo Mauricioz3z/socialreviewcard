@@ -134,7 +134,12 @@ export default function App() {
   const [config, setConfig] = useState<PublicConfig | null>(null);
   const [showMobilePreview, setShowMobilePreview] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
-  const [reelLayers, setReelLayers] = useState<{ base: string; stars: string; text: string } | null>(null);
+  const [reelLayers, setReelLayers] = useState<{
+    base: string;
+    stars: string;
+    text: string;
+    wordRects: { x: number; y: number; w: number; h: number }[];
+  } | null>(null);
 
   const captureRef = useRef<HTMLDivElement>(null);
   const reelBaseRef = useRef<HTMLDivElement>(null);
@@ -511,7 +516,24 @@ export default function App() {
         renderNode(reelStarsRef.current),
         renderNode(reelTextRef.current),
       ]);
-      setReelLayers({ base, stars, text });
+      // Measure each word's box (normalized to the card) for per-word reveal.
+      const root = reelTextRef.current;
+      let wordRects: { x: number; y: number; w: number; h: number }[] = [];
+      if (root) {
+        const rb = root.getBoundingClientRect();
+        if (rb.width && rb.height) {
+          wordRects = Array.from(root.querySelectorAll('.reel-word')).map((el) => {
+            const r = (el as HTMLElement).getBoundingClientRect();
+            return {
+              x: (r.left - rb.left) / rb.width,
+              y: (r.top - rb.top) / rb.height,
+              w: r.width / rb.width,
+              h: r.height / rb.height,
+            };
+          });
+        }
+      }
+      setReelLayers({ base, stars, text, wordRects });
     } catch {
       showToast('Could not prepare', 'We could not render the card. Try again.', 'error');
     }

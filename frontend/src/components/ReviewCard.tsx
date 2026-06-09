@@ -157,7 +157,7 @@ export function ReviewCard({
         <div className="relative" style={hide(showText)}>
           {font === 'serif' && (
             <span
-              className="absolute -top-6 -left-1 leading-none select-none"
+              className="reel-word absolute -top-6 -left-1 leading-none select-none"
               style={{ fontFamily: 'Newsreader, serif', fontSize: 72, color: S.quoteMark }}
             >
               &ldquo;
@@ -172,7 +172,13 @@ export function ReviewCard({
               letterSpacing: font === 'serif' ? '0' : '-0.01em',
             }}
           >
-            {font === 'serif' ? review : '“' + review + '”'}
+            {layer === 'text'
+              ? (font === 'serif' ? review : '“' + review + '”')
+                  .split(/(\s+)/)
+                  .map((tok, i) => (/^\s+$/.test(tok) ? tok : <span key={i} className="reel-word">{tok}</span>))
+              : font === 'serif'
+                ? review
+                : '“' + review + '”'}
           </p>
         </div>
       </div>

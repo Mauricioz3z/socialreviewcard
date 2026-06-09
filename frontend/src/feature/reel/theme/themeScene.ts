@@ -1,12 +1,24 @@
 import type { BackgroundSpec, ForegroundAsset, ReelTheme, TransformOrigin } from './schema';
 
+/** Rectangle normalized to 0..1 of the card bitmap. */
+export interface NormRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 /** The card rasterized into independently-animatable layers. */
 export interface CardLayers {
   base: ImageBitmap; // container + platform + footer (no stars/text)
   stars?: ImageBitmap | null;
   text?: ImageBitmap | null;
-  /** Centroid of the stars (in base-bitmap px) so the pop scales in place. */
+  /** Centroid of the stars (in base-bitmap px) — fallback group pop. */
   starsCenter?: { x: number; y: number } | null;
+  /** Per-star boxes for staggered pop (segmented from the stars layer). */
+  starRects?: NormRect[] | null;
+  /** Per-word boxes for staggered text reveal (measured from the DOM). */
+  wordRects?: NormRect[] | null;
 }
 
 /* ----------------------------- timing primitives ----------------------------- */
@@ -180,34 +192,79 @@ export function createThemeScene(
       ctx.drawImage(layers.base, -bw / 2, -bh / 2);
       ctx.restore();
 
-      // stars — staggered group "pop" scaling in place
+      // stars — per-star staggered pop (falls back to a group pop)
       const sr = theme.contentTimeline?.starsReveal;
       if (layers.stars) {
-        const sp = sr ? stepProgress(tMs, sr.delayMs, sr.durationMs ?? 450) : 1;
-        if (sp > 0) {
-          const pop = sr ? backOut(sp) : 1;
-          const cx = (layers.starsCenter?.x ?? bw / 2) - bw / 2;
-          const cy = (layers.starsCenter?.y ?? bh / 2) - bh / 2;
-          ctx.save();
-          ctx.globalAlpha = alpha * clamp01(sp * 1.6);
-          ctx.translate(cx, cy);
-          ctx.scale(pop, pop);
-          ctx.translate(-cx, -cy);
-          ctx.drawImage(layers.stars, -bw / 2, -bh / 2);
-          ctx.restore();
+        const stars = layers.stars;
+        if (sr && layers.starRects && layers.starRects.length > 1) {
+          const stagger = sr.staggerMs ?? 120;
+          const dur = sr.durationMs ?? 360;
+          layers.starRects.forEach((r, i) => {
+            const sp = stepProgress(tMs, sr.delayMs + i * stagger, dur);
+            if (sp <= 0) return;
+            const pop = backOut(sp);
+            const sx = r.x * bw;
+            const sy = r.y * bh;
+            const sw = r.w * bw;
+            const sh = r.h * bh;
+            const cxp = sx + sw / 2 - bw / 2;
+            const cyp = sy + sh / 2 - bh / 2;
+            ctx.save();
+            ctx.globalAlpha = alpha * clamp01(sp * 1.6);
+            ctx.translate(cxp, cyp);
+            ctx.scale(pop, pop);
+            ctx.translate(-cxp, -cyp);
+            ctx.drawImage(stars, sx, sy, sw, sh, sx - bw / 2, sy - bh / 2, sw, sh);
+            ctx.restore();
+          });
+        } else {
+          const sp = sr ? stepProgress(tMs, sr.delayMs, sr.durationMs ?? 450) : 1;
+          if (sp > 0) {
+            const pop = sr ? backOut(sp) : 1;
+            const cx = (layers.starsCenter?.x ?? bw / 2) - bw / 2;
+            const cy = (layers.starsCenter?.y ?? bh / 2) - bh / 2;
+            ctx.save();
+            ctx.globalAlpha = alpha * clamp01(sp * 1.6);
+            ctx.translate(cx, cy);
+            ctx.scale(pop, pop);
+            ctx.translate(-cx, -cy);
+            ctx.drawImage(stars, -bw / 2, -bh / 2);
+            ctx.restore();
+          }
         }
       }
 
-      // text — fade + slide up
+      // text — per-word staggered fade-up (falls back to a block reveal)
       const tr = theme.contentTimeline?.textReveal;
       if (layers.text) {
-        const tp = tr ? easeOutCubic(stepProgress(tMs, tr.delayMs, tr.durationMs ?? 700)) : 1;
-        if (tp > 0) {
-          ctx.save();
-          ctx.globalAlpha = alpha * tp;
-          ctx.translate(0, (1 - tp) * 46);
-          ctx.drawImage(layers.text, -bw / 2, -bh / 2);
-          ctx.restore();
+        const text = layers.text;
+        if (tr && layers.wordRects && layers.wordRects.length > 0) {
+          const stagger = tr.staggerMs ?? 60;
+          const dur = tr.durationMs ?? 420;
+          const padX = bw * 0.005;
+          const padY = bh * 0.004;
+          layers.wordRects.forEach((r, i) => {
+            const wp = easeOutCubic(stepProgress(tMs, tr.delayMs + i * stagger, dur));
+            if (wp <= 0) return;
+            const sx = Math.max(0, r.x * bw - padX);
+            const sy = Math.max(0, r.y * bh - padY);
+            const sw = r.w * bw + padX * 2;
+            const sh = r.h * bh + padY * 2;
+            ctx.save();
+            ctx.globalAlpha = alpha * wp;
+            ctx.translate(0, (1 - wp) * 30);
+            ctx.drawImage(text, sx, sy, sw, sh, sx - bw / 2, sy - bh / 2, sw, sh);
+            ctx.restore();
+          });
+        } else {
+          const tp = tr ? easeOutCubic(stepProgress(tMs, tr.delayMs, tr.durationMs ?? 700)) : 1;
+          if (tp > 0) {
+            ctx.save();
+            ctx.globalAlpha = alpha * tp;
+            ctx.translate(0, (1 - tp) * 46);
+            ctx.drawImage(text, -bw / 2, -bh / 2);
+            ctx.restore();
+          }
         }
       }
 

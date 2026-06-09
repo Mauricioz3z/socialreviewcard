@@ -45,12 +45,66 @@ function alphaCentroid(bmp: ImageBitmap): { x: number; y: number } | null {
   return found ? { x: (minX + maxX) / 2, y: (minY + maxY) / 2 } : null;
 }
 
+/** Segments the stars row into per-star boxes by detecting column gaps. */
+function starRectsFromBitmap(bmp: ImageBitmap): { x: number; y: number; w: number; h: number }[] {
+  const c = document.createElement('canvas');
+  c.width = bmp.width;
+  c.height = bmp.height;
+  const cx = c.getContext('2d');
+  if (!cx) return [];
+  cx.drawImage(bmp, 0, 0);
+  let data: Uint8ClampedArray;
+  try {
+    data = cx.getImageData(0, 0, c.width, c.height).data;
+  } catch {
+    return [];
+  }
+  const W = c.width;
+  const H = c.height;
+  const colOpaque: boolean[] = new Array(W).fill(false);
+  let minY = H;
+  let maxY = 0;
+  for (let x = 0; x < W; x++) {
+    let op = false;
+    for (let y = 0; y < H; y += 2) {
+      if (data[(y * W + x) * 4 + 3] > 16) {
+        op = true;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+    colOpaque[x] = op;
+  }
+  const gapThresh = Math.max(3, Math.floor(W * 0.004));
+  const runs: [number, number][] = [];
+  let runStart = -1;
+  let empty = 0;
+  for (let x = 0; x < W; x++) {
+    if (colOpaque[x]) {
+      if (runStart < 0) runStart = x;
+      empty = 0;
+    } else if (runStart >= 0) {
+      empty++;
+      if (empty >= gapThresh) {
+        runs.push([runStart, x - empty]);
+        runStart = -1;
+        empty = 0;
+      }
+    }
+  }
+  if (runStart >= 0) runs.push([runStart, W - 1]);
+  const bandH = Math.max(1, maxY - minY);
+  return runs
+    .filter(([a, b]) => b - a > 2)
+    .map(([a, b]) => ({ x: a / W, y: minY / H, w: (b - a) / W, h: bandH / H }));
+}
+
 export function ReelModal({
   layers,
   onClose,
   theme = bohoBotanicalV1,
 }: {
-  layers: { base: string; stars: string; text: string };
+  layers: { base: string; stars: string; text: string; wordRects: { x: number; y: number; w: number; h: number }[] };
   onClose: () => void;
   theme?: ReelTheme;
 }) {
@@ -85,7 +139,14 @@ export function ReelModal({
           bmpFromUrl(layers.text),
         ]);
         if (cancelled) return;
-        const card: CardLayers = { base, stars, text, starsCenter: alphaCentroid(stars) };
+        const card: CardLayers = {
+          base,
+          stars,
+          text,
+          starsCenter: alphaCentroid(stars),
+          starRects: starRectsFromBitmap(stars),
+          wordRects: layers.wordRects,
+        };
         cardRef.current = card;
         assetsRef.current = assets;
         setStatus('idle');
