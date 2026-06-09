@@ -95,7 +95,7 @@ export function AuthModal({
               <Quote size={15} strokeWidth={2.2} />
             </span>
             <div>
-              <div className="font-bold text-[15px] tracking-tight leading-none">Sign in to ReviewCraft</div>
+              <div className="font-bold text-[15px] tracking-tight leading-none">Sign in to SocialReviewCard</div>
               <div className="text-[12px] text-zinc-400 mt-1">Save your cards and export images</div>
             </div>
           </div>

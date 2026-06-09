@@ -25,10 +25,13 @@ public class ApplicationUser : IdentityUser
     public DateTime? SubscriptionEndDate { get; set; }
 
     /// <summary>
-    /// Number of free-quota image exports the user has consumed. Counts toward the
-    /// free cap (see UsageEndpoints); not incremented for Pro accounts.
+    /// Free-quota image exports consumed in the current monthly period (see
+    /// UsageEndpoints). Resets to 0 at the start of a new calendar month.
     /// </summary>
     public int FreeExportsUsed { get; set; }
+
+    /// <summary>Start of the period the <see cref="FreeExportsUsed"/> counter belongs to.</summary>
+    public DateTime? FreeExportsPeriodStart { get; set; }
 
     /// <summary>
     /// Lifetime number of image exports across all plans (free + Pro), used for

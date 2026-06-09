@@ -129,7 +129,7 @@ export default function Landing() {
                 <span className="inline-flex items-center gap-0.5 rounded-full bg-ink text-[#ffd66e] px-2 py-0.5">
                   {[0, 1, 2, 3, 4].map((i) => <Star key={i} size={11} fill="#ffd66e" strokeWidth={0} />)}
                 </span>
-                <span className="text-[12.5px] font-semibold text-ink-soft">Loved by 2,400+ indie sellers</span>
+                <span className="text-[12.5px] font-semibold text-ink-soft">Early access — be one of the first 100 sellers</span>
               </div>
               <h1 className="font-serif leading-[0.98] tracking-[-0.02em]" style={{ fontSize: 'clamp(44px, 6.2vw, 76px)', fontWeight: 500 }}>
                 Turn five-star reviews into{' '}
@@ -253,27 +253,40 @@ export default function Landing() {
           </div>
         </section>
 
-        {/* ---- Testimonials ---- */}
-        <section className="mx-auto max-w-[1200px] px-6 pb-24 lg:pb-32">
+        {/* ---- Why sellers switch (honest comparison) ---- */}
+        <section className="mx-auto max-w-[1200px] px-6 pb-16 lg:pb-20">
           <div className="reveal text-center max-w-xl mx-auto mb-14">
             <SectionLabel>Why sellers switch</SectionLabel>
-            <h2 className="font-serif leading-[1.03] tracking-[-0.02em] mt-4" style={{ fontSize: 'clamp(30px, 4vw, 48px)', fontWeight: 500 }}>People feel the difference.</h2>
+            <h2 className="font-serif leading-[1.03] tracking-[-0.02em] mt-4" style={{ fontSize: 'clamp(30px, 4vw, 48px)', fontWeight: 500 }}>The math is simple.</h2>
           </div>
           <div className="grid md:grid-cols-3 gap-6">
             {[
-              { q: 'I turned a week of Etsy reviews into a whole month of Stories in one sitting. My saves doubled.', n: 'Priya Nair', r: 'Handmade jewelry · Etsy', init: 'PN', c: '#ff9aa2' },
-              { q: 'Finally my social proof looks as premium as my products. The dark style is unreal.', n: 'Marcus Bell', r: 'Leather goods · Shopify', init: 'MB', c: '#8b6cff' },
-              { q: 'No more clunky Canva templates. Paste, pick a gradient, post. That’s it.', n: 'Lena Cho', r: 'Skincare · Instagram', init: 'LC', c: '#19c8ff' },
-            ].map((t, i) => (
-              <div key={t.n} className="reveal rounded-3xl bg-white border border-line p-8 flex flex-col" style={{ transitionDelay: i * 70 + 'ms' }}>
-                <div className="flex gap-0.5 mb-5">{[0, 1, 2, 3, 4].map((s) => <Star key={s} size={17} fill="#f5a623" strokeWidth={0} />)}</div>
-                <p className="font-serif text-[20px] leading-[1.42] flex-1" style={{ fontWeight: 500 }}>“{t.q}”</p>
-                <div className="flex items-center gap-3 mt-7 pt-5 border-t border-line">
-                  <span className="grid place-items-center w-11 h-11 rounded-full font-bold text-white text-[14px]" style={{ background: t.c }}>{t.init}</span>
-                  <div><div className="font-semibold text-[14.5px]">{t.n}</div><div className="text-[12.5px] text-ink-soft">{t.r}</div></div>
-                </div>
+              { t: 'The old way', body: 'Open Canva → hunt for a template → paste the review → fix the font → align the stars → resize for Stories → export.', em: '~15 minutes per post.' },
+              { t: 'With SocialReviewCard', body: 'Paste the review, pick a style, export.', em: 'Under 30 seconds — and it looks like a brand designed it.' },
+              { t: 'What that buys you', body: 'A week of reviews becomes a month of Stories in one sitting.', em: 'More social proof posted = more trust = more sales.' },
+            ].map((c, i) => (
+              <div key={c.t} className="reveal rounded-3xl bg-white border border-line p-8 flex flex-col" style={{ transitionDelay: i * 70 + 'ms' }}>
+                <h3 className="font-ui font-bold text-[17px] tracking-tight">{c.t}</h3>
+                <p className="mt-3 text-[14.5px] leading-relaxed text-ink-soft flex-1">{c.body}</p>
+                <p className="mt-4 font-serif text-[18px] text-ink" style={{ fontWeight: 500 }}>{c.em}</p>
               </div>
             ))}
+          </div>
+        </section>
+
+        {/* ---- A note from the founder ---- */}
+        <section className="mx-auto max-w-[760px] px-6 pb-24 lg:pb-32">
+          <div className="reveal rounded-3xl bg-white border border-line p-8 lg:p-10">
+            <div className="font-ui font-bold text-[13px] uppercase tracking-wider text-ink-soft/70 mb-4">A note from the founder</div>
+            <div className="space-y-4 font-serif text-[18px] leading-[1.5] text-ink" style={{ fontWeight: 500 }}>
+              <p>Hi — I'm Mauricio. I built SocialReviewCard because turning a great review into a great post shouldn't take 15 minutes in Canva.</p>
+              <p>
+                It's early days: no fake testimonials, no inflated numbers — just a tool I'm improving every week based on
+                what real sellers tell me. If something feels off, tell me and I'll fix it. If you love it, a screenshot of
+                your card on Instagram makes my day.
+              </p>
+            </div>
+            <div className="mt-5 font-ui text-[14px] text-ink-soft">— Mauricio, indie maker</div>
           </div>
         </section>
 
@@ -336,7 +349,7 @@ export default function Landing() {
 
       {/* ---- Footer ---- */}
       <footer className="border-t border-line bg-white/40">
-        <div className="mx-auto max-w-[1200px] px-6 py-16 grid md:grid-cols-[1.4fr_1fr_1fr_1fr] gap-10">
+        <div className="mx-auto max-w-[1200px] px-6 py-16 grid md:grid-cols-[1.6fr_1fr_1fr] gap-10">
           <div>
             <div className="flex items-center gap-2.5">
               <span className="grid place-items-center w-9 h-9 rounded-[11px] bg-ink text-cream"><Quote size={18} strokeWidth={2.2} /></span>
@@ -344,10 +357,23 @@ export default function Landing() {
             </div>
             <p className="mt-4 text-[14px] text-ink-soft max-w-xs leading-relaxed">Beautiful, shareable review cards for indie sellers — built in seconds.</p>
           </div>
-          {([['Product', ['How it works', 'Styles', 'Features', 'Pricing']], ['Company', ['About', 'Blog', 'Contact', 'Affiliates']], ['Legal', ['Privacy', 'Terms', 'Cookies']]] as [string, string[]][]).map(([h, links]) => (
+          {(
+            [
+              ['Product', [['How it works', '#how'], ['Styles', '#styles'], ['Features', '#features'], ['Pricing', '#pricing']]],
+              ['Legal', [['Privacy', '/privacy'], ['Terms', '/terms']]],
+            ] as [string, [string, string][]][]
+          ).map(([h, links]) => (
             <div key={h}>
               <div className="font-semibold text-[13px] uppercase tracking-wider text-ink-soft/70 mb-4">{h}</div>
-              <ul className="space-y-2.5">{links.map((l) => <li key={l}><a href={CTA} className="text-[14.5px] text-ink hover:text-ink-soft transition">{l}</a></li>)}</ul>
+              <ul className="space-y-2.5">
+                {links.map(([l, href]) => (
+                  <li key={l}>
+                    <a href={href} className="text-[14.5px] text-ink hover:text-ink-soft transition">
+                      {l}
+                    </a>
+                  </li>
+                ))}
+              </ul>
             </div>
           ))}
         </div>

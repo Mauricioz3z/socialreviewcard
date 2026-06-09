@@ -15,30 +15,15 @@ interface CanvasProps {
   layer?: CardLayer;
 }
 
-const escapeXml = (s: string) =>
-  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-
 /**
  * Repeating diagonal watermark covering the whole canvas. The tile is horizontal
  * text; the oversized layer is rotated so it reads as diagonal rows, and the
  * card's overflow:hidden clips it — making it hard to crop out cleanly.
  */
 function Watermark({ text }: { text: string }) {
-  const tile = `<svg xmlns='http://www.w3.org/2000/svg' width='300' height='92'><text x='8' y='56' font-family='Arial, Helvetica, sans-serif' font-size='17' font-weight='700' fill='white'>${escapeXml(text)}</text></svg>`;
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden>
-      {/* subtle repeating diagonal */}
-      <div
-        style={{
-          position: 'absolute',
-          inset: '-60%',
-          transform: 'rotate(-30deg)',
-          backgroundRepeat: 'repeat',
-          backgroundImage: `url("data:image/svg+xml,${encodeURIComponent(tile)}")`,
-          opacity: 0.13,
-        }}
-      />
-      {/* more visible footer credit so viewers know where it was made */}
+      {/* footer credit only — the free card stays clean enough to actually post */}
       <div style={{ position: 'absolute', bottom: 12, left: 0, right: 0, display: 'flex', justifyContent: 'center' }}>
         <span
           style={{

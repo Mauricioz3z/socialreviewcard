@@ -226,7 +226,7 @@ export default function App() {
       }
       if (cancelled) return;
       if (pro) {
-        showToast('Subscription active', 'Welcome to ReviewCraft Pro — unlimited exports.');
+        showToast('Subscription active', 'Welcome to SocialReviewCard Pro — unlimited exports.');
       } else if (tries < 6) {
         setTimeout(poll, 1500);
       }
@@ -564,7 +564,7 @@ export default function App() {
               <Quote size={18} strokeWidth={2.2} />
             </div>
             <div className="min-w-0">
-              <div className="font-bold text-[16px] tracking-tight leading-none">ReviewCraft</div>
+              <div className="font-bold text-[16px] tracking-tight leading-none">SocialReviewCard</div>
               <div className="text-[11.5px] text-zinc-400 mt-0.5 truncate">Turn reviews into shareable art</div>
             </div>
           </div>
@@ -1043,7 +1043,18 @@ export default function App() {
       )}
 
       {/* ============ REEL (animated video) ============ */}
-      {reelLayers && <ReelModal layers={reelLayers} scene={scene} onClose={() => setReelLayers(null)} />}
+      {reelLayers && (
+        <ReelModal
+          layers={reelLayers}
+          scene={scene}
+          canExport={usage?.isPro ?? false}
+          onUpgrade={() => {
+            setReelLayers(null);
+            setShowUpgrade(true);
+          }}
+          onClose={() => setReelLayers(null)}
+        />
+      )}
 
       {/* ============ SCENE COMPOSER ============ */}
       {composeUrl && (
@@ -1121,7 +1132,7 @@ function UpgradeModal({
   config: PublicConfig | null;
 }) {
   const title = config?.upgradeTitle || "You're out of free exports";
-  const subtitle = config?.upgradeSubtitle || 'Upgrade to ReviewCraft Pro to keep exporting';
+  const subtitle = config?.upgradeSubtitle || 'Upgrade to SocialReviewCard Pro to keep exporting';
   const priceLabel = config?.proPriceLabel || '$1.99/mo';
   const perks =
     config?.proFeatures && config.proFeatures.length > 0

@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import AdminApp from './AdminApp';
 import Landing from './Landing';
+import Legal from './Legal';
 import './index.css';
 
 // Lightweight path routing — no router dependency. nginx serves index.html for
@@ -16,6 +17,10 @@ const path = window.location.pathname;
 const isApp = path.startsWith('/app') || path.startsWith('/billing');
 const view = path.startsWith('/chuchubeleza') ? (
   <AdminApp />
+) : path.startsWith('/privacy') ? (
+  <Legal kind="privacy" />
+) : path.startsWith('/terms') ? (
+  <Legal kind="terms" />
 ) : isApp ? (
   <App />
 ) : (

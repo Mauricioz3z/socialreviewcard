@@ -104,10 +104,14 @@ function starRectsFromBitmap(bmp: ImageBitmap): { x: number; y: number; w: numbe
 export function ReelModal({
   layers,
   scene = null,
+  canExport = true,
+  onUpgrade,
   onClose,
 }: {
   layers: { base: string; stars: string; text: string; wordRects: { x: number; y: number; w: number; h: number }[] };
   scene?: UserScene | null;
+  canExport?: boolean;
+  onUpgrade?: () => void;
   onClose: () => void;
 }) {
   const [themes, setThemes] = useState<ReelTheme[]>(scene ? [userSceneToTheme(scene)] : [bohoBotanicalV1]);
@@ -201,6 +205,10 @@ export function ReelModal({
   }, [layers, theme]);
 
   const onExport = async () => {
+    if (!canExport) {
+      onUpgrade?.();
+      return;
+    }
     const canvas = canvasRef.current;
     const card = cardRef.current;
     const ctx = canvas?.getContext('2d');
@@ -340,13 +348,25 @@ export function ReelModal({
                 </button>
               </>
             ) : (
-              <button
-                onClick={onExport}
-                disabled={status !== 'idle'}
-                className="w-full flex items-center justify-center gap-2 h-12 rounded-xl bg-accent text-white text-[14.5px] font-semibold hover:bg-accent-hover transition disabled:opacity-60"
-              >
-                {busy ? <Loader2 size={18} className="animate-spin" /> : <Clapperboard size={18} />} Export video
-              </button>
+              <>
+                <button
+                  onClick={onExport}
+                  disabled={status !== 'idle'}
+                  className="w-full flex items-center justify-center gap-2 h-12 rounded-xl bg-accent text-white text-[14.5px] font-semibold hover:bg-accent-hover transition disabled:opacity-60"
+                >
+                  {busy ? (
+                    <Loader2 size={18} className="animate-spin" />
+                  ) : (
+                    <Clapperboard size={18} />
+                  )}{' '}
+                  {canExport ? 'Export video' : 'Upgrade to export · Pro'}
+                </button>
+                {!canExport && (
+                  <p className="text-center text-[11.5px] text-zinc-400">
+                    Preview is free — video export is a Pro feature.
+                  </p>
+                )}
+              </>
             )}
           </div>
         </div>
