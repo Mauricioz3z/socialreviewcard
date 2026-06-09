@@ -91,7 +91,7 @@ export function SceneComposer({
     const move = (ev: PointerEvent) => {
       const dx = (ev.clientX - s.x) / r.width;
       const dy = (ev.clientY - s.y) / r.height;
-      if (mode === 'move') patchAsset(idx, { xPct: clamp(s.ox + dx, 0, 1), yPct: clamp(s.oy + dy, 0, 1) });
+      if (mode === 'move') patchAsset(idx, { xPct: clamp(s.ox + dx, -1, 1), yPct: clamp(s.oy + dy, -1, 1) });
       else patchAsset(idx, { widthPct: clamp(s.ow + dx, 0.05, 1) });
     };
     const up = () => {
@@ -156,7 +156,14 @@ export function SceneComposer({
         </button>
 
         {playing ? (
-          <canvas ref={playCanvasRef} width={1080} height={1920} className="h-full w-auto rounded-2xl shadow-2xl" style={{ aspectRatio: '9 / 16' }} />
+          <div className="relative h-full w-auto" style={{ aspectRatio: '9 / 16', maxHeight: '100%' }}>
+            <canvas
+              ref={playCanvasRef}
+              width={1080}
+              height={1920}
+              className="block w-full h-full rounded-2xl shadow-2xl"
+            />
+          </div>
         ) : (
           <div
             ref={stageRef}
