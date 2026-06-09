@@ -1,18 +1,29 @@
 import { useEffect, useRef, useState } from 'react';
 import { Clapperboard, Download, Loader2, X } from 'lucide-react';
-import { createMinimalScene } from './scene/minimalScene';
 import { exportReel } from './export/exportReel';
-
-const W = 1080;
-const H = 1920;
-const DURATION = 6000;
-const FPS = 30;
+import { bohoBotanicalV1 } from './theme/presets';
+import { createThemeScene, loadThemeAssets } from './theme/themeScene';
+import type { ReelTheme } from './theme/schema';
 
 type Status = 'loading' | 'idle' | 'recording' | 'transcoding' | 'done' | 'error';
 
-export function ReelModal({ cardImageUrl, onClose }: { cardImageUrl: string; onClose: () => void }) {
+export function ReelModal({
+  cardImageUrl,
+  onClose,
+  theme = bohoBotanicalV1,
+}: {
+  cardImageUrl: string;
+  onClose: () => void;
+  theme?: ReelTheme;
+}) {
+  const W = theme.dimensions.width;
+  const H = theme.dimensions.height;
+  const DURATION = theme.totalDurationMs;
+  const FPS = theme.fps ?? 30;
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const bitmapRef = useRef<ImageBitmap | null>(null);
+  const assetsRef = useRef<Record<string, HTMLImageElement>>({});
   const rafRef = useRef<number | null>(null);
 
   const [status, setStatus] = useState<Status>('loading');
@@ -29,15 +40,19 @@ export function ReelModal({ cardImageUrl, onClose }: { cardImageUrl: string; onC
     let cancelled = false;
     (async () => {
       try {
-        const blob = await (await fetch(cardImageUrl)).blob();
+        const [blob, assets] = await Promise.all([
+          fetch(cardImageUrl).then((r) => r.blob()),
+          loadThemeAssets(theme),
+        ]);
         const bmp = await createImageBitmap(blob);
         if (cancelled) return;
         bitmapRef.current = bmp;
+        assetsRef.current = assets;
         setStatus('idle');
 
         const ctx = canvasRef.current?.getContext('2d');
         if (!ctx) return;
-        const scene = createMinimalScene(ctx, W, H, bmp, DURATION);
+        const scene = createThemeScene(ctx, theme, bmp, assets);
         const start = performance.now();
         const loop = (now: number) => {
           scene((now - start) % DURATION);
@@ -52,7 +67,7 @@ export function ReelModal({ cardImageUrl, onClose }: { cardImageUrl: string; onC
       cancelled = true;
       stopPreview();
     };
-  }, [cardImageUrl]);
+  }, [cardImageUrl, theme]);
 
   const onExport = async () => {
     const canvas = canvasRef.current;
@@ -63,7 +78,7 @@ export function ReelModal({ cardImageUrl, onClose }: { cardImageUrl: string; onC
     stopPreview();
     setProgress(0);
     setStatus('recording');
-    const scene = createMinimalScene(ctx, W, H, bmp, DURATION);
+    const scene = createThemeScene(ctx, theme, bmp, assetsRef.current);
     try {
       const out = await exportReel({
         canvas,
