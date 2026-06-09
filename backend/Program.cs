@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using SocialReviewCard.Data;
 using SocialReviewCard.Endpoints;
 using SocialReviewCard.Models;
@@ -59,6 +60,9 @@ builder.Services.AddScoped<IStripeService, StripeService>();
 
 // Audit logging for backoffice actions.
 builder.Services.AddScoped<IAuditLogger, AuditLogger>();
+
+// Persistent store for admin-uploaded assets.
+builder.Services.AddSingleton<UploadStore>();
 
 // Clock abstraction used by the bearer-token refresh endpoint.
 builder.Services.AddSingleton(TimeProvider.System);
@@ -130,6 +134,21 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors(CorsPolicy);
+
+// Serve admin-uploaded assets at /uploads (loaded as <img>; lock them down with
+// a strict CSP + nosniff so an uploaded SVG can't run script if opened directly).
+var uploadStore = app.Services.GetRequiredService<UploadStore>();
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(uploadStore.Root),
+    RequestPath = "/uploads",
+    OnPrepareResponse = ctx =>
+    {
+        ctx.Context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+        ctx.Context.Response.Headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; img-src data:";
+        ctx.Context.Response.Headers["Cache-Control"] = "public, max-age=86400";
+    },
+});
 
 app.UseAuthentication();
 app.UseAuthorization();

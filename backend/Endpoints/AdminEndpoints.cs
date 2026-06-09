@@ -405,6 +405,55 @@ public static class AdminEndpoints
             return Results.NoContent();
         });
 
+        // ---- Asset uploads ----
+        group.MapPost("/assets", async (
+            HttpRequest req,
+            UploadStore store,
+            IAuditLogger audit,
+            ClaimsPrincipal principal,
+            HttpContext http) =>
+        {
+            if (!req.HasFormContentType) return Results.BadRequest(new { error = "Expected multipart form data." });
+            var form = await req.ReadFormAsync();
+            var file = form.Files.GetFile("file") ?? form.Files.FirstOrDefault();
+            if (file is null || file.Length == 0) return Results.BadRequest(new { error = "No file uploaded." });
+            if (file.Length > 2 * 1024 * 1024) return Results.BadRequest(new { error = "Max file size is 2 MB." });
+
+            var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+            string[] allowed = { ".svg", ".png", ".jpg", ".jpeg", ".webp" };
+            if (!allowed.Contains(ext)) return Results.BadRequest(new { error = "Allowed types: SVG, PNG, JPG, WEBP." });
+
+            var name = UploadStore.SafeName(file.FileName);
+            await using (var fs = File.Create(store.PathFor(name)))
+                await file.CopyToAsync(fs);
+            await audit.LogAsync(AdminEmail(principal), "asset.upload", name, ClientIp(http));
+            return Results.Ok(new { name, url = "/uploads/" + name, size = file.Length });
+        })
+        .DisableAntiforgery();
+
+        group.MapGet("/assets", (UploadStore store) =>
+        {
+            if (!Directory.Exists(store.Root)) return Results.Ok(Array.Empty<object>());
+            var files = new DirectoryInfo(store.Root).GetFiles()
+                .OrderByDescending(f => f.LastWriteTimeUtc)
+                .Select(f => new { name = f.Name, url = "/uploads/" + f.Name, size = f.Length });
+            return Results.Ok(files);
+        });
+
+        group.MapDelete("/assets/{name}", async (
+            string name,
+            UploadStore store,
+            IAuditLogger audit,
+            ClaimsPrincipal principal,
+            HttpContext http) =>
+        {
+            var path = store.PathFor(name);
+            if (!File.Exists(path)) return Results.NotFound();
+            File.Delete(path);
+            await audit.LogAsync(AdminEmail(principal), "asset.delete", Path.GetFileName(name), ClientIp(http));
+            return Results.NoContent();
+        });
+
         // GET /api/admin/audit?skip=&take=
         group.MapGet("/audit", async (ApplicationDbContext db, int skip, int take, CancellationToken ct) =>
         {

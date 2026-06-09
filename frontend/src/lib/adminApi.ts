@@ -241,3 +241,35 @@ export const adminUpdateReelTheme = (token: string, id: number, body: ReelThemeU
 
 export const adminDeleteReelTheme = (token: string, id: number) =>
   adminRequest<void>(`/api/admin/reel-themes/${id}`, token, { method: 'DELETE' });
+
+export interface AssetItem {
+  name: string;
+  url: string;
+  size: number;
+}
+
+export const adminListAssets = (token: string) => adminRequest<AssetItem[]>('/api/admin/assets', token);
+
+export async function adminUploadAsset(token: string, file: File): Promise<AssetItem> {
+  const fd = new FormData();
+  fd.append('file', file);
+  const res = await fetch(`${API_BASE}/api/admin/assets`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: fd,
+  });
+  if (!res.ok) {
+    let msg = res.statusText || 'Upload failed';
+    try {
+      const d = await res.json();
+      if (d?.error) msg = d.error;
+    } catch {
+      /* keep */
+    }
+    throw new ApiError(msg, res.status);
+  }
+  return res.json();
+}
+
+export const adminDeleteAsset = (token: string, name: string) =>
+  adminRequest<void>(`/api/admin/assets/${encodeURIComponent(name)}`, token, { method: 'DELETE' });

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Activity,
   BarChart3,
@@ -7,6 +7,7 @@ import {
   Clapperboard,
   Crown,
   Droplet,
+  Image as ImageIcon,
   Loader2,
   LogOut,
   MessageCircle,
@@ -17,6 +18,7 @@ import {
   Shield,
   Store,
   Trash2,
+  Upload,
   Users,
 } from 'lucide-react';
 import { ApiError } from './lib/api';
@@ -37,6 +39,9 @@ import {
   adminCreateReelTheme,
   adminUpdateReelTheme,
   adminDeleteReelTheme,
+  adminListAssets,
+  adminUploadAsset,
+  adminDeleteAsset,
   adminMarkFeedback,
   adminPutSettings,
   adminRefresh,
@@ -46,6 +51,7 @@ import {
   type AdminMetrics,
   type AdminPlatform,
   type AdminReelTheme,
+  type AssetItem,
   type AdminSession,
   type AdminSettings,
   type AdminUser,
@@ -58,6 +64,7 @@ type Tab =
   | 'users'
   | 'platforms'
   | 'reel-themes'
+  | 'assets'
   | 'monetization'
   | 'watermark'
   | 'scripts'
@@ -190,6 +197,7 @@ function AdminShell({
     { id: 'users', label: 'Users', Icon: Users },
     { id: 'platforms', label: 'Platforms', Icon: Store },
     { id: 'reel-themes', label: 'Reel Themes', Icon: Clapperboard },
+    { id: 'assets', label: 'Assets', Icon: ImageIcon },
     { id: 'monetization', label: 'Monetization', Icon: Crown },
     { id: 'watermark', label: 'Watermark', Icon: Droplet },
     { id: 'scripts', label: 'Scripts', Icon: Code2 },
@@ -239,6 +247,7 @@ function AdminShell({
           {tab === 'users' && <UsersTab call={call} flash={flash} />}
           {tab === 'platforms' && <PlatformsTab call={call} flash={flash} />}
           {tab === 'reel-themes' && <ReelThemesTab call={call} flash={flash} />}
+          {tab === 'assets' && <AssetsTab call={call} flash={flash} />}
           {tab === 'monetization' && <MonetizationTab call={call} flash={flash} />}
           {tab === 'watermark' && <WatermarkTab call={call} flash={flash} />}
           {tab === 'scripts' && <ScriptsTab call={call} flash={flash} />}
@@ -1028,6 +1037,110 @@ function prettyJson(s: string): string {
   } catch {
     return s;
   }
+}
+
+/* ====================================================================== */
+/*  Assets (uploads)                                                      */
+/* ====================================================================== */
+function AssetsTab({ call, flash }: { call: Caller; flash: Flash }) {
+  const [items, setItems] = useState<AssetItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const load = () => {
+    setLoading(true);
+    call(adminListAssets)
+      .then(setItems)
+      .catch(() => setItems([]))
+      .finally(() => setLoading(false));
+  };
+  useEffect(load, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const onPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setUploading(true);
+    try {
+      await call((t) => adminUploadAsset(t, file));
+      flash('Asset uploaded');
+      load();
+    } catch (err) {
+      flash(err instanceof ApiError ? err.message : 'Upload failed', 'err');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const remove = async (a: AssetItem) => {
+    if (!confirm(`Delete ${a.name}? Themes referencing it will lose the asset.`)) return;
+    try {
+      await call((t) => adminDeleteAsset(t, a.name));
+      setItems((prev) => prev.filter((x) => x.name !== a.name));
+    } catch {
+      flash('Delete failed', 'err');
+    }
+  };
+
+  const copy = (url: string) => {
+    navigator.clipboard?.writeText(url);
+    flash('URL copied');
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <h1 className="text-[20px] font-bold tracking-tight">Assets</h1>
+          <p className="text-[13px] text-zinc-500 mt-0.5">
+            Images used by reel themes (SVG/PNG, ≤ 2 MB). Reference them by URL in a theme.
+          </p>
+        </div>
+        <div>
+          <input ref={fileRef} type="file" accept=".svg,.png,.jpg,.jpeg,.webp,image/*" className="hidden" onChange={onPick} />
+          <button
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-zinc-900 text-white text-[12.5px] font-semibold disabled:opacity-60"
+          >
+            {uploading ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />} Upload
+          </button>
+        </div>
+      </div>
+
+      {loading ? (
+        <Spinner />
+      ) : items.length === 0 ? (
+        <div className="bg-white rounded-xl border border-zinc-200 py-16 text-center text-zinc-400 text-[13px]">
+          No assets yet — upload your botanical SVGs/PNGs.
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+          {items.map((a) => (
+            <div key={a.name} className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
+              <div className="aspect-square grid place-items-center bg-zinc-50 p-3">
+                <img src={a.url} alt={a.name} className="max-h-full max-w-full object-contain" />
+              </div>
+              <div className="p-2.5">
+                <div className="text-[11.5px] font-medium truncate" title={a.name}>
+                  {a.name}
+                </div>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <button onClick={() => copy(a.url)} className="text-[11.5px] font-semibold text-accent hover:underline">
+                    Copy URL
+                  </button>
+                  <button onClick={() => remove(a)} className="ml-auto text-zinc-400 hover:text-red-600">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 /* ====================================================================== */
