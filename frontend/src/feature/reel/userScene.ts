@@ -7,6 +7,9 @@ export interface SceneAsset {
   yPct: number; // top edge
   widthPct: number; // width as fraction of frame width
   anim: 'sway' | 'float' | 'none';
+  rotation?: number; // degrees, 0..360
+  flipX?: boolean; // mirror horizontally
+  layer?: 'front' | 'behind'; // relative to the card (default front)
 }
 
 /** Per-card animation scene the user composes and saves with their card. */
@@ -57,13 +60,15 @@ export function userSceneToTheme(scene: UserScene): ReelTheme {
       size: { width: Math.round(a.widthPct * W) },
       transformOrigin: 'center' as const,
       opacity: 0.95,
+      rotationDeg: a.rotation ?? 0,
+      flipX: a.flipX ?? false,
       animation:
         a.anim === 'sway'
           ? { type: 'sway' as const, maxRotationDeg: 1 + i * 3, frequencyHz: 0.18 + i * 0.12 }
           : a.anim === 'float'
             ? { type: 'float' as const, amplitudePx: 6 + i * 18, frequencyHz: 0.15 + i * 0.1 }
             : { type: 'none' as const },
-      layer: 'front-card' as const,
+      layer: (a.layer ?? 'front') === 'behind' ? ('behind-card' as const) : ('front-card' as const),
     })),
     cardContainer: {
       entranceDelayMs: 500,

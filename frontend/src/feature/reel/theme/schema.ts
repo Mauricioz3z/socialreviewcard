@@ -26,6 +26,8 @@ export interface ForegroundAsset {
   position: EdgeAnchor; // px offsets from the named edges
   size?: { width?: number; height?: number }; // px; missing dim preserves aspect
   opacity?: number; // 0..1
+  rotationDeg?: number; // static base rotation
+  flipX?: boolean; // mirror horizontally
   transformOrigin?: TransformOrigin;
   animation?: AssetAnimation;
   layer?: 'behind-card' | 'front-card'; // default behind-card

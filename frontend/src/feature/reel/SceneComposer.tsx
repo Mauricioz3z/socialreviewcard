@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, RotateCcw, Trash2, X } from 'lucide-react';
+import { FlipHorizontal2, Loader2, Play, RotateCcw, Square, Trash2, X } from 'lucide-react';
 import { getAssets } from '../../lib/api';
-import { SCENE_PALETTES, defaultScene, type SceneAsset, type UserScene } from './userScene';
+import { SCENE_PALETTES, defaultScene, userSceneToTheme, type SceneAsset, type UserScene } from './userScene';
+import { createThemeScene, loadThemeAssets } from './theme/themeScene';
 
 const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, x));
 const gradientCss = (colors: string[]) =>
@@ -21,17 +22,55 @@ export function SceneComposer({
   const [scene, setScene] = useState<UserScene>(initial ?? defaultScene());
   const [selected, setSelected] = useState<number | null>(null);
   const [gallery, setGallery] = useState<{ name: string; url: string }[] | null>(null);
+  const [playing, setPlaying] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
+  const playCanvasRef = useRef<HTMLCanvasElement>(null);
+  const sceneRef = useRef(scene);
+  sceneRef.current = scene;
 
   useEffect(() => {
     getAssets().then(setGallery).catch(() => setGallery([]));
   }, []);
 
+  // Live preview: run the real engine on a canvas (single-layer card + assets).
+  useEffect(() => {
+    if (!playing) return;
+    let cancelled = false;
+    let raf = 0;
+    (async () => {
+      try {
+        const bmp = await fetch(cardImageUrl)
+          .then((r) => r.blob())
+          .then((b) => createImageBitmap(b));
+        const assets = await loadThemeAssets(userSceneToTheme(sceneRef.current));
+        if (cancelled) return;
+        const ctx = playCanvasRef.current?.getContext('2d');
+        if (!ctx) return;
+        const start = performance.now();
+        const loop = (now: number) => {
+          const theme = userSceneToTheme(sceneRef.current);
+          createThemeScene(ctx, theme, { base: bmp }, assets)((now - start) % theme.totalDurationMs);
+          raf = requestAnimationFrame(loop);
+        };
+        raf = requestAnimationFrame(loop);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(raf);
+    };
+  }, [playing, cardImageUrl]);
+
   const patchAsset = (idx: number, patch: Partial<SceneAsset>) =>
     setScene((p) => ({ ...p, assets: p.assets.map((a, i) => (i === idx ? { ...a, ...patch } : a)) }));
 
   const addAsset = (url: string) => {
-    setScene((p) => ({ ...p, assets: [...p.assets, { url, xPct: 0.36, yPct: 0.36, widthPct: 0.26, anim: 'sway' }] }));
+    setScene((p) => ({
+      ...p,
+      assets: [...p.assets, { url, xPct: 0.36, yPct: 0.36, widthPct: 0.26, anim: 'sway', rotation: 0, flipX: false, layer: 'front' }],
+    }));
     setSelected(scene.assets.length);
   };
 
@@ -40,7 +79,6 @@ export function SceneComposer({
     setSelected(null);
   };
 
-  // Pointer drag / resize — closures share state so listeners stay consistent.
   const startDrag = (e: React.PointerEvent, idx: number, mode: 'move' | 'resize') => {
     e.preventDefault();
     e.stopPropagation();
@@ -64,57 +102,85 @@ export function SceneComposer({
     window.addEventListener('pointerup', up);
   };
 
+  const renderAsset = (idx: number) => {
+    const a = scene.assets[idx];
+    return (
+      <div
+        key={idx}
+        onPointerDown={(e) => startDrag(e, idx, 'move')}
+        className="absolute"
+        style={{
+          left: `${a.xPct * 100}%`,
+          top: `${a.yPct * 100}%`,
+          width: `${a.widthPct * 100}%`,
+          transform: `rotate(${a.rotation ?? 0}deg) scaleX(${a.flipX ? -1 : 1})`,
+          transformOrigin: 'center',
+          cursor: 'move',
+          touchAction: 'none',
+          outline: selected === idx ? '2px solid #6d5efc' : 'none',
+          outlineOffset: 2,
+        }}
+      >
+        <img src={a.url} draggable={false} className="w-full block pointer-events-none select-none" alt="" />
+        {selected === idx && (
+          <div
+            onPointerDown={(e) => startDrag(e, idx, 'resize')}
+            className="absolute -right-1.5 -bottom-1.5 w-3.5 h-3.5 rounded-sm bg-accent"
+            style={{ cursor: 'nwse-resize' }}
+          />
+        )}
+      </div>
+    );
+  };
+
   const sel = selected != null ? scene.assets[selected] : null;
+  const layerOf = (a: SceneAsset) => a.layer ?? 'front';
 
   return (
-    <div className="fixed inset-0 z-[70] flex bg-zinc-950/95 backdrop-blur-sm font-ui">
+    <div className="fixed inset-0 z-[70] flex flex-col lg:flex-row bg-zinc-950/95 backdrop-blur-sm font-ui">
       {/* stage */}
-      <div className="flex-1 grid place-items-center p-6 overflow-hidden">
-        <div
-          ref={stageRef}
-          onPointerDown={(e) => {
-            if (e.target === e.currentTarget) setSelected(null);
-          }}
-          className="relative h-full max-h-[88vh] rounded-2xl overflow-hidden shadow-2xl"
-          style={{ aspectRatio: '9 / 16', background: gradientCss(scene.palette), touchAction: 'none' }}
+      <div className="relative flex-1 min-h-0 grid place-items-center p-3 lg:p-6 overflow-hidden">
+        <button
+          onClick={() => setPlaying((p) => !p)}
+          className="absolute top-3 left-1/2 -translate-x-1/2 z-10 inline-flex items-center gap-2 px-4 h-9 rounded-full bg-white/90 text-zinc-900 text-[13px] font-semibold shadow-lg hover:bg-white transition"
         >
-          <img
-            src={cardImageUrl}
-            alt="card"
-            draggable={false}
-            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
-            style={{ width: '78%', filter: 'drop-shadow(0 20px 50px rgba(0,0,0,0.45))' }}
-          />
-          {scene.assets.map((a, idx) => (
-            <div
-              key={idx}
-              onPointerDown={(e) => startDrag(e, idx, 'move')}
-              className="absolute"
-              style={{
-                left: `${a.xPct * 100}%`,
-                top: `${a.yPct * 100}%`,
-                width: `${a.widthPct * 100}%`,
-                cursor: 'move',
-                touchAction: 'none',
-                outline: selected === idx ? '2px solid #6d5efc' : 'none',
-                outlineOffset: 2,
-              }}
-            >
-              <img src={a.url} draggable={false} className="w-full block pointer-events-none select-none" alt="" />
-              {selected === idx && (
-                <div
-                  onPointerDown={(e) => startDrag(e, idx, 'resize')}
-                  className="absolute -right-1.5 -bottom-1.5 w-3.5 h-3.5 rounded-sm bg-accent"
-                  style={{ cursor: 'nwse-resize' }}
-                />
-              )}
-            </div>
-          ))}
-        </div>
+          {playing ? (
+            <>
+              <Square size={14} /> Stop
+            </>
+          ) : (
+            <>
+              <Play size={14} /> Play preview
+            </>
+          )}
+        </button>
+
+        {playing ? (
+          <canvas ref={playCanvasRef} width={1080} height={1920} className="h-full w-auto rounded-2xl shadow-2xl" style={{ aspectRatio: '9 / 16' }} />
+        ) : (
+          <div
+            ref={stageRef}
+            onPointerDown={(e) => {
+              if (e.target === e.currentTarget) setSelected(null);
+            }}
+            className="relative h-full w-auto rounded-2xl overflow-hidden shadow-2xl"
+            style={{ aspectRatio: '9 / 16', maxHeight: '100%', background: gradientCss(scene.palette), touchAction: 'none' }}
+          >
+            {scene.assets.map((_, i) => (layerOf(scene.assets[i]) === 'behind' ? renderAsset(i) : null))}
+            <img
+              src={cardImageUrl}
+              alt="card"
+              draggable={false}
+              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+              style={{ width: '78%', filter: 'drop-shadow(0 20px 50px rgba(0,0,0,0.45))' }}
+            />
+            {scene.assets.map((_, i) => (layerOf(scene.assets[i]) !== 'behind' ? renderAsset(i) : null))}
+          </div>
+        )}
       </div>
 
       {/* panel */}
-      <aside className="w-[340px] shrink-0 h-full bg-white flex flex-col">
+      <aside className="w-full lg:w-[340px] shrink-0 lg:h-full bg-white flex flex-col max-h-[55vh] lg:max-h-none">
         <div className="h-14 shrink-0 flex items-center justify-between px-5 border-b border-zinc-100">
           <span className="font-bold text-[15px] text-zinc-900">Compose scene</span>
           <button onClick={onClose} className="text-zinc-300 hover:text-zinc-500 transition">
@@ -127,7 +193,9 @@ export function SceneComposer({
           <div>
             <Label>Decorations</Label>
             {gallery === null ? (
-              <div className="py-6 grid place-items-center text-zinc-400"><Loader2 size={18} className="animate-spin" /></div>
+              <div className="py-6 grid place-items-center text-zinc-400">
+                <Loader2 size={18} className="animate-spin" />
+              </div>
             ) : gallery.length === 0 ? (
               <p className="text-[12px] text-zinc-400">No assets available yet.</p>
             ) : (
@@ -144,27 +212,50 @@ export function SceneComposer({
                 ))}
               </div>
             )}
-            {sel && (
-              <div className="mt-3 rounded-xl border border-zinc-200 p-3">
-                <div className="flex items-center justify-between mb-2">
+
+            {sel && selected != null && (
+              <div className="mt-3 rounded-xl border border-zinc-200 p-3 space-y-3">
+                <div className="flex items-center justify-between">
                   <span className="text-[12px] font-semibold text-zinc-600">Selected decoration</span>
-                  <button onClick={() => removeAsset(selected!)} className="text-zinc-400 hover:text-red-600">
+                  <button onClick={() => removeAsset(selected)} className="text-zinc-400 hover:text-red-600">
                     <Trash2 size={14} />
                   </button>
                 </div>
+
+                {/* animation */}
                 <div className="grid grid-cols-3 gap-1.5">
                   {(['sway', 'float', 'none'] as const).map((m) => (
-                    <button
-                      key={m}
-                      onClick={() => patchAsset(selected!, { anim: m })}
-                      className={
-                        'h-8 rounded-lg text-[12px] font-semibold border capitalize transition ' +
-                        (sel.anim === m ? 'border-accent bg-accent-soft text-accent' : 'border-zinc-200 text-zinc-600')
-                      }
-                    >
+                    <Chip key={m} active={sel.anim === m} onClick={() => patchAsset(selected, { anim: m })}>
                       {m}
-                    </button>
+                    </Chip>
                   ))}
+                </div>
+
+                {/* rotation */}
+                <div>
+                  <div className="text-[11.5px] text-zinc-500 mb-1">Rotation · {Math.round(sel.rotation ?? 0)}°</div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={360}
+                    value={Math.round(sel.rotation ?? 0)}
+                    onChange={(e) => patchAsset(selected, { rotation: Number(e.target.value) })}
+                    className="w-full accent-[#6d5efc]"
+                  />
+                </div>
+
+                {/* flip + layer */}
+                <div className="grid grid-cols-3 gap-1.5">
+                  <Chip active={!!sel.flipX} onClick={() => patchAsset(selected, { flipX: !sel.flipX })}>
+                    <FlipHorizontal2 size={13} className="inline -mt-0.5 mr-1" />
+                    Flip
+                  </Chip>
+                  <Chip active={layerOf(sel) === 'front'} onClick={() => patchAsset(selected, { layer: 'front' })}>
+                    Front
+                  </Chip>
+                  <Chip active={layerOf(sel) === 'behind'} onClick={() => patchAsset(selected, { layer: 'behind' })}>
+                    Back
+                  </Chip>
                 </div>
               </div>
             )}
@@ -246,4 +337,18 @@ export function SceneComposer({
 
 function Label({ children }: { children: React.ReactNode }) {
   return <div className="text-[12px] font-bold uppercase tracking-wide text-zinc-400 mb-2">{children}</div>;
+}
+
+function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={
+        'h-8 rounded-lg text-[12px] font-semibold border capitalize transition ' +
+        (active ? 'border-accent bg-accent-soft text-accent' : 'border-zinc-200 text-zinc-600 hover:border-zinc-300')
+      }
+    >
+      {children}
+    </button>
+  );
 }

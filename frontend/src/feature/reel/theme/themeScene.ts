@@ -115,6 +115,10 @@ function paintAsset(
   ctx.save();
   ctx.globalAlpha = spec.opacity ?? 1;
   ctx.translate(px, py);
+  // static base transform
+  if (spec.rotationDeg) ctx.rotate(rad(spec.rotationDeg));
+  if (spec.flipX) ctx.scale(-1, 1);
+  // continuous animation
   const an = spec.animation;
   if (an?.type === 'sway') {
     ctx.rotate(rad(an.maxRotationDeg) * Math.sin(TAU * an.frequencyHz * t + (an.phase ?? 0)));
