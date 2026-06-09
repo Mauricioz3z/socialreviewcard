@@ -24,13 +24,17 @@ export function AuthModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Keep the latest onAuthed without re-running the effect (it changes identity
+  // on every parent render — re-initializing GIS would rebind the button to a
+  // stale callback and the credential would never be delivered).
+  const onAuthedRef = useRef(onAuthed);
+  onAuthedRef.current = onAuthed;
+
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) {
       setError("Google sign-in isn't configured (set VITE_GOOGLE_CLIENT_ID).");
       return;
     }
-
-    let cancelled = false;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handleCredential = async (resp: any) => {
@@ -39,12 +43,10 @@ export function AuthModal({
       setError(null);
       try {
         const session = await googleLogin(resp.credential);
-        if (!cancelled) onAuthed(session);
+        onAuthedRef.current(session); // closes the modal (unmounts) on success
       } catch (err) {
-        if (!cancelled)
-          setError(err instanceof ApiError ? 'Could not sign you in. Please try again.' : 'Unexpected error.');
-      } finally {
-        if (!cancelled) setBusy(false);
+        setError(err instanceof ApiError ? 'Could not sign you in. Please try again.' : 'Unexpected error.');
+        setBusy(false);
       }
     };
 
@@ -61,25 +63,28 @@ export function AuthModal({
       });
     };
 
+    let script: HTMLScriptElement | null = null;
     if (window.google?.accounts?.id) {
       init();
     } else {
-      let s = document.getElementById('gis-script') as HTMLScriptElement | null;
-      if (!s) {
-        s = document.createElement('script');
-        s.src = 'https://accounts.google.com/gsi/client';
-        s.async = true;
-        s.defer = true;
-        s.id = 'gis-script';
-        document.body.appendChild(s);
+      script = document.getElementById('gis-script') as HTMLScriptElement | null;
+      if (!script) {
+        script = document.createElement('script');
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.async = true;
+        script.defer = true;
+        script.id = 'gis-script';
+        document.body.appendChild(script);
       }
-      s.addEventListener('load', init);
+      script.addEventListener('load', init);
     }
 
     return () => {
-      cancelled = true;
+      script?.removeEventListener('load', init);
     };
-  }, [onAuthed]);
+    // Run once on mount — intentionally not depending on onAuthed (see ref above).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-black/40 backdrop-blur-sm p-4">
