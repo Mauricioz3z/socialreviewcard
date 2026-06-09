@@ -1,12 +1,15 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using SocialReviewCard.Data;
 using SocialReviewCard.Models;
 using SocialReviewCard.Services;
 
 namespace SocialReviewCard.Endpoints;
 
 /// <summary>
-/// Stripe billing endpoints: starting a checkout session and receiving webhooks.
+/// Stripe billing endpoints: plans (DB-managed), starting checkout, and webhooks.
 /// </summary>
 public static class BillingEndpoints
 {
@@ -14,10 +17,43 @@ public static class BillingEndpoints
     {
         var group = routes.MapGroup("/api/billing").WithTags("Billing");
 
+        // GET /api/billing/plans -> public plan list (no Stripe price ids).
+        group.MapGet("/plans", async (ApplicationDbContext db, CancellationToken ct) =>
+        {
+            var plans = await db.BillingPlans.AsNoTracking()
+                .Where(p => p.Enabled)
+                .OrderBy(p => p.SortOrder)
+                .Select(p => new PublicBillingPlanDto
+                {
+                    Id = p.Id, Name = p.Name, PriceLabel = p.PriceLabel, Kind = p.Kind, Interval = p.Interval, Featured = p.Featured,
+                })
+                .ToListAsync(ct);
+            return Results.Ok(plans);
+        }).AllowAnonymous();
+
+        // GET /api/billing/founder-count -> claimed/limit for the lifetime plan.
+        group.MapGet("/founder-count", async (ApplicationDbContext db, CancellationToken ct) =>
+        {
+            var lifetime = await db.BillingPlans.AsNoTracking()
+                .Where(p => p.Enabled && p.Kind == "lifetime")
+                .OrderBy(p => p.SortOrder)
+                .FirstOrDefaultAsync(ct);
+            var claimed = await db.Users.CountAsync(u => u.IsLifetime, ct);
+            var limit = lifetime?.MaxRedemptions;
+            return Results.Ok(new FounderCountResponse
+            {
+                Claimed = claimed,
+                Limit = limit,
+                Available = lifetime != null && (limit == null || claimed < limit),
+            });
+        }).AllowAnonymous();
+
         // POST /api/billing/checkout -> returns the hosted Stripe Checkout URL.
         group.MapPost("/checkout", async (
+            [FromBody] CheckoutRequest? request,
             ClaimsPrincipal principal,
             UserManager<ApplicationUser> userManager,
+            ApplicationDbContext db,
             IStripeService stripe,
             CancellationToken ct) =>
         {
@@ -27,9 +63,28 @@ public static class BillingEndpoints
             var user = await userManager.FindByIdAsync(userId);
             if (user is null) return Results.Unauthorized();
 
+            // Resolve the plan: explicit id, else the featured/first enabled plan.
+            BillingPlan? plan = null;
+            if (request?.PlanId is int pid)
+                plan = await db.BillingPlans.FirstOrDefaultAsync(p => p.Id == pid && p.Enabled, ct);
+            plan ??= await db.BillingPlans.Where(p => p.Enabled)
+                .OrderByDescending(p => p.Featured).ThenBy(p => p.SortOrder)
+                .FirstOrDefaultAsync(ct);
+
+            if (plan is null)
+                return Results.Problem("No billing plan is configured.", statusCode: StatusCodes.Status502BadGateway);
+
+            var lifetime = string.Equals(plan.Kind, "lifetime", StringComparison.OrdinalIgnoreCase);
+            if (lifetime && plan.MaxRedemptions is int max)
+            {
+                var claimed = await db.Users.CountAsync(u => u.IsLifetime, ct);
+                if (claimed >= max)
+                    return Results.Problem("This deal is sold out.", statusCode: StatusCodes.Status409Conflict);
+            }
+
             try
             {
-                var url = await stripe.CreateCheckoutSessionAsync(user, ct);
+                var url = await stripe.CreateCheckoutSessionAsync(user, plan.StripePriceId, lifetime, ct);
                 return Results.Ok(new CheckoutResponse { Url = url });
             }
             catch (Exception ex) when (ex is InvalidOperationException or Stripe.StripeException)
@@ -57,7 +112,7 @@ public static class BillingEndpoints
             {
                 Status = user.SubscriptionStatus,
                 SubscriptionEndDate = user.SubscriptionEndDate,
-                IsPro = string.Equals(user.SubscriptionStatus, "active", StringComparison.OrdinalIgnoreCase),
+                IsPro = user.IsLifetime || string.Equals(user.SubscriptionStatus, "active", StringComparison.OrdinalIgnoreCase),
             });
         })
         .RequireAuthorization();

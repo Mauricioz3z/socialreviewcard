@@ -5,6 +5,7 @@ import {
   Code2,
   Check,
   Clapperboard,
+  CreditCard,
   Crown,
   Droplet,
   Image as ImageIcon,
@@ -42,6 +43,10 @@ import {
   adminListAssets,
   adminUploadAsset,
   adminDeleteAsset,
+  adminListBillingPlans,
+  adminCreateBillingPlan,
+  adminUpdateBillingPlan,
+  adminDeleteBillingPlan,
   adminMarkFeedback,
   adminPutSettings,
   adminRefresh,
@@ -51,6 +56,7 @@ import {
   type AdminMetrics,
   type AdminPlatform,
   type AdminReelTheme,
+  type AdminBillingPlan,
   type AssetItem,
   type AdminSession,
   type AdminSettings,
@@ -65,6 +71,7 @@ type Tab =
   | 'platforms'
   | 'reel-themes'
   | 'assets'
+  | 'billing'
   | 'monetization'
   | 'watermark'
   | 'scripts'
@@ -198,6 +205,7 @@ function AdminShell({
     { id: 'platforms', label: 'Platforms', Icon: Store },
     { id: 'reel-themes', label: 'Reel Themes', Icon: Clapperboard },
     { id: 'assets', label: 'Assets', Icon: ImageIcon },
+    { id: 'billing', label: 'Billing', Icon: CreditCard },
     { id: 'monetization', label: 'Monetization', Icon: Crown },
     { id: 'watermark', label: 'Watermark', Icon: Droplet },
     { id: 'scripts', label: 'Scripts', Icon: Code2 },
@@ -248,6 +256,7 @@ function AdminShell({
           {tab === 'platforms' && <PlatformsTab call={call} flash={flash} />}
           {tab === 'reel-themes' && <ReelThemesTab call={call} flash={flash} />}
           {tab === 'assets' && <AssetsTab call={call} flash={flash} />}
+          {tab === 'billing' && <BillingTab call={call} flash={flash} />}
           {tab === 'monetization' && <MonetizationTab call={call} flash={flash} />}
           {tab === 'watermark' && <WatermarkTab call={call} flash={flash} />}
           {tab === 'scripts' && <ScriptsTab call={call} flash={flash} />}
@@ -1141,6 +1150,251 @@ function AssetsTab({ call, flash }: { call: Caller; flash: Flash }) {
       )}
     </div>
   );
+}
+
+/* ====================================================================== */
+/*  Billing plans                                                         */
+/* ====================================================================== */
+function BillingTab({ call, flash }: { call: Caller; flash: Flash }) {
+  const [items, setItems] = useState<AdminBillingPlan[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState<AdminBillingPlan | 'new' | null>(null);
+
+  const load = () => {
+    setLoading(true);
+    call(adminListBillingPlans)
+      .then(setItems)
+      .catch(() => setItems([]))
+      .finally(() => setLoading(false));
+  };
+  useEffect(load, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const remove = async (p: AdminBillingPlan) => {
+    if (!confirm(`Delete plan "${p.name}"?`)) return;
+    try {
+      await call((t) => adminDeleteBillingPlan(t, p.id));
+      flash('Plan deleted');
+      setItems((prev) => prev.filter((x) => x.id !== p.id));
+    } catch {
+      flash('Delete failed', 'err');
+    }
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <h1 className="text-[20px] font-bold tracking-tight">Billing plans</h1>
+          <p className="text-[13px] text-zinc-500 mt-0.5">Stripe prices, labels and the Founder's Deal cap — no redeploy needed.</p>
+        </div>
+        <button
+          onClick={() => setEditing('new')}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-zinc-900 text-white text-[12.5px] font-semibold"
+        >
+          <Plus size={15} /> Add plan
+        </button>
+      </div>
+
+      {loading ? (
+        <Spinner />
+      ) : (
+        <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
+          <table className="w-full text-[13px]">
+            <thead className="bg-zinc-50 text-zinc-500 text-[11.5px] uppercase tracking-wide">
+              <tr>
+                <th className="text-left font-semibold px-4 py-2.5">Plan</th>
+                <th className="text-left font-semibold px-4 py-2.5">Price id</th>
+                <th className="text-left font-semibold px-4 py-2.5">Kind</th>
+                <th className="text-left font-semibold px-4 py-2.5">Status</th>
+                <th className="px-4 py-2.5"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((p) => (
+                <tr key={p.id} className="border-t border-zinc-100">
+                  <td className="px-4 py-2.5">
+                    <span className="font-medium">{p.name}</span>
+                    <span className="text-zinc-400"> · {p.priceLabel}</span>
+                    {p.featured && <span className="ml-2 text-[10px] font-bold text-accent uppercase">Featured</span>}
+                  </td>
+                  <td className="px-4 py-2.5 font-mono text-[11.5px] text-zinc-500 truncate max-w-[180px]">{p.stripePriceId}</td>
+                  <td className="px-4 py-2.5">
+                    <span className={'text-[12px] font-semibold ' + (p.kind === 'lifetime' ? 'text-amber-600' : 'text-zinc-600')}>
+                      {p.kind}
+                      {p.kind === 'lifetime' && p.maxRedemptions != null ? ` · ${p.maxRedemptions} max` : ''}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    {p.enabled ? (
+                      <span className="text-emerald-600 text-[12px] font-semibold">Enabled</span>
+                    ) : (
+                      <span className="text-zinc-400 text-[12px]">Hidden</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                    <button onClick={() => setEditing(p)} className="text-[12px] font-semibold text-accent hover:underline mr-3">
+                      Edit
+                    </button>
+                    <button onClick={() => remove(p)} className="text-zinc-400 hover:text-red-600">
+                      <Trash2 size={15} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {items.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-10 text-center text-zinc-400">
+                    No plans yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {editing && (
+        <BillingPlanEditModal
+          plan={editing === 'new' ? null : editing}
+          call={call}
+          flash={flash}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            load();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function BillingPlanEditModal({
+  plan,
+  call,
+  flash,
+  onClose,
+  onSaved,
+}: {
+  plan: AdminBillingPlan | null;
+  call: Caller;
+  flash: Flash;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [name, setName] = useState(plan?.name ?? '');
+  const [stripePriceId, setStripePriceId] = useState(plan?.stripePriceId ?? '');
+  const [kind, setKind] = useState(plan?.kind ?? 'subscription');
+  const [priceLabel, setPriceLabel] = useState(plan?.priceLabel ?? '');
+  const [interval, setInterval] = useState(plan?.interval ?? 'month');
+  const [sortOrder, setSortOrder] = useState(plan?.sortOrder ?? 0);
+  const [enabled, setEnabled] = useState(plan?.enabled ?? true);
+  const [featured, setFeatured] = useState(plan?.featured ?? false);
+  const [maxRedemptions, setMaxRedemptions] = useState<string>(plan?.maxRedemptions != null ? String(plan.maxRedemptions) : '');
+  const [saving, setSaving] = useState(false);
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || !stripePriceId.trim() || saving) return;
+    setSaving(true);
+    const body = {
+      name: name.trim(),
+      stripePriceId: stripePriceId.trim(),
+      kind,
+      priceLabel: priceLabel.trim(),
+      interval,
+      sortOrder,
+      enabled,
+      featured,
+      maxRedemptions: maxRedemptions.trim() === '' ? null : Math.max(0, Number(maxRedemptions)),
+    };
+    try {
+      if (plan) await call((t) => adminUpdateBillingPlan(t, plan.id, body));
+      else await call((t) => adminCreateBillingPlan(t, body));
+      flash('Plan saved');
+      onSaved();
+    } catch {
+      flash('Save failed', 'err');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const field = 'w-full rounded-lg border border-zinc-200 px-3 py-2 text-[13px] outline-none focus:border-accent';
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" onClick={onClose}>
+      <form onClick={(e) => e.stopPropagation()} onSubmit={save} className="w-full max-w-[460px] bg-white rounded-2xl shadow-2xl p-6 max-h-[92vh] overflow-y-auto">
+        <div className="font-bold text-[15px] mb-4">{plan ? 'Edit plan' : 'New plan'}</div>
+
+        <L>Name</L>
+        <input value={name} onChange={(e) => setName(e.target.value)} autoFocus className={field + ' mb-3'} />
+
+        <L>Stripe price id</L>
+        <input value={stripePriceId} onChange={(e) => setStripePriceId(e.target.value)} placeholder="price_..." className={field + ' mb-3 font-mono text-[12px]'} />
+
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <div>
+            <L>Kind</L>
+            <select value={kind} onChange={(e) => setKind(e.target.value)} className={field}>
+              <option value="subscription">subscription</option>
+              <option value="lifetime">lifetime (one-time)</option>
+            </select>
+          </div>
+          <div>
+            <L>Interval</L>
+            <select value={interval} onChange={(e) => setInterval(e.target.value)} className={field}>
+              <option value="month">month</option>
+              <option value="year">year</option>
+              <option value="once">once</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <div>
+            <L>Price label</L>
+            <input value={priceLabel} onChange={(e) => setPriceLabel(e.target.value)} placeholder="$7/mo" className={field} />
+          </div>
+          <div>
+            <L>Order</L>
+            <input type="number" value={sortOrder} onChange={(e) => setSortOrder(Number(e.target.value))} className={field} />
+          </div>
+        </div>
+
+        {kind === 'lifetime' && (
+          <div className="mb-3">
+            <L>Max redemptions (Founder's Deal cap — blank = unlimited)</L>
+            <input type="number" value={maxRedemptions} onChange={(e) => setMaxRedemptions(e.target.value)} placeholder="100" className={field} />
+          </div>
+        )}
+
+        <div className="flex gap-5 my-4">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} className="w-4 h-4 accent-[#6d5efc]" />
+            <span className="text-[13px]">Enabled</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={featured} onChange={(e) => setFeatured(e.target.checked)} className="w-4 h-4 accent-[#6d5efc]" />
+            <span className="text-[13px]">Featured (used by in-app upgrade)</span>
+          </label>
+        </div>
+
+        <div className="flex gap-2">
+          <button type="button" onClick={onClose} className="flex-1 h-10 rounded-lg border border-zinc-200 text-[13px] font-semibold">
+            Cancel
+          </button>
+          <button type="submit" disabled={saving} className="flex-1 h-10 rounded-lg bg-zinc-900 text-white text-[13px] font-semibold flex items-center justify-center gap-2 disabled:opacity-60">
+            {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Save
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function L({ children }: { children: React.ReactNode }) {
+  return <label className="block text-[12px] text-zinc-500 mb-1">{children}</label>;
 }
 
 /* ====================================================================== */

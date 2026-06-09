@@ -92,7 +92,7 @@ public static class UsageEndpoints
     }
 
     private static bool IsPro(ApplicationUser user) =>
-        string.Equals(user.SubscriptionStatus, "active", StringComparison.OrdinalIgnoreCase);
+        user.IsLifetime || string.Equals(user.SubscriptionStatus, "active", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>True when the stored counter belongs to a previous month.</summary>
     private static bool IsNewPeriod(ApplicationUser user, DateTime now) =>

@@ -33,10 +33,10 @@ public class StripeService : IStripeService
         StripeConfiguration.ApiKey = _options.SecretKey;
     }
 
-    public async Task<string> CreateCheckoutSessionAsync(ApplicationUser user, CancellationToken cancellationToken = default)
+    public async Task<string> CreateCheckoutSessionAsync(ApplicationUser user, string priceId, bool lifetime, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(_options.PriceId))
-            throw new InvalidOperationException("Stripe PriceId is not configured.");
+        if (string.IsNullOrWhiteSpace(priceId))
+            throw new InvalidOperationException("No Stripe price id was provided for checkout.");
 
         // Reuse an existing Stripe customer when we have one; otherwise let Checkout
         // create one from the supplied email (captured back via the webhook).
@@ -44,25 +44,23 @@ public class StripeService : IStripeService
         {
             ["userId"] = user.Id,
             ["email"] = user.Email ?? string.Empty,
+            ["lifetime"] = lifetime ? "true" : "false",
         };
 
         var sessionOptions = new SessionCreateOptions
         {
-            Mode = "subscription",
+            Mode = lifetime ? "payment" : "subscription",
             ClientReferenceId = user.Id,
             SuccessUrl = _options.SuccessUrl,
             CancelUrl = _options.CancelUrl,
             LineItems = new List<SessionLineItemOptions>
             {
-                new() { Price = _options.PriceId, Quantity = 1 },
+                new() { Price = priceId, Quantity = 1 },
             },
             Metadata = metadata,
-            // Propagate the same metadata onto the created subscription so that
-            // customer.subscription.* webhooks can be reconciled to the account.
-            SubscriptionData = new SessionSubscriptionDataOptions
-            {
-                Metadata = metadata,
-            },
+            // Recurring plans: propagate metadata onto the subscription so the
+            // customer.subscription.* webhooks reconcile to the account.
+            SubscriptionData = lifetime ? null : new SessionSubscriptionDataOptions { Metadata = metadata },
         };
 
         if (!string.IsNullOrWhiteSpace(user.StripeCustomerId))
@@ -153,15 +151,24 @@ public class StripeService : IStripeService
 
         user.SubscriptionStatus = "active";
 
-        // Pull the subscription to record the period end date.
-        if (!string.IsNullOrWhiteSpace(session.SubscriptionId))
+        // One-time (lifetime) purchase: mark Pro forever; there's no subscription.
+        var isLifetime = string.Equals(session.Mode, "payment", StringComparison.OrdinalIgnoreCase)
+            || (session.Metadata != null && session.Metadata.TryGetValue("lifetime", out var lt) && lt == "true");
+        if (isLifetime)
         {
+            user.IsLifetime = true;
+            user.SubscriptionEndDate = null;
+        }
+        else if (!string.IsNullOrWhiteSpace(session.SubscriptionId))
+        {
+            // Recurring: pull the subscription to record the period end date.
             var sub = await new SubscriptionService().GetAsync(session.SubscriptionId, cancellationToken: cancellationToken);
             ApplySubscriptionState(user, sub);
         }
 
         await _db.SaveChangesAsync(cancellationToken);
-        _logger.LogInformation("Activated subscription for user {UserId} via session {SessionId}", user.Id, session.Id);
+        _logger.LogInformation("Activated {Kind} for user {UserId} via session {SessionId}",
+            isLifetime ? "lifetime" : "subscription", user.Id, session.Id);
     }
 
     private async Task HandleSubscriptionChangedAsync(Event stripeEvent, CancellationToken cancellationToken)

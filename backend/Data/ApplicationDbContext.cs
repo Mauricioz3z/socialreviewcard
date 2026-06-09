@@ -21,6 +21,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<Feedback> Feedback => Set<Feedback>();
     public DbSet<Platform> Platforms => Set<Platform>();
     public DbSet<ReelTheme> ReelThemes => Set<ReelTheme>();
+    public DbSet<BillingPlan> BillingPlans => Set<BillingPlan>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -113,6 +114,31 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
                 new Platform { Id = 3, Label = "Amazon", Color = "#E88A1A", Icon = "fab:amazon", SortOrder = 3, Enabled = true },
                 new Platform { Id = 4, Label = "Instagram", Color = "#E1306C", Icon = "fab:instagram", SortOrder = 4, Enabled = true },
                 new Platform { Id = 5, Label = "Google", Color = "#4285F4", Icon = "fab:google", SortOrder = 5, Enabled = true });
+        });
+
+        builder.Entity<BillingPlan>(entity =>
+        {
+            entity.HasKey(p => p.Id);
+            entity.Property(p => p.Name).IsRequired().HasMaxLength(80);
+            entity.Property(p => p.StripePriceId).IsRequired().HasMaxLength(120);
+            entity.Property(p => p.Kind).IsRequired().HasMaxLength(20);
+            entity.Property(p => p.PriceLabel).HasMaxLength(40);
+            entity.Property(p => p.Interval).HasMaxLength(20);
+
+            // Seed from the current single configured price (the monthly Pro plan).
+            entity.HasData(new BillingPlan
+            {
+                Id = 1,
+                Name = "Pro Monthly",
+                StripePriceId = "price_1TedWRIbIKIBamh8uORORo43",
+                Kind = "subscription",
+                PriceLabel = "$1.99/mo",
+                Interval = "month",
+                Enabled = true,
+                SortOrder = 1,
+                Featured = true,
+                MaxRedemptions = null,
+            });
         });
 
         builder.Entity<ReelTheme>(entity =>

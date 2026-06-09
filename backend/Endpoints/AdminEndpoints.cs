@@ -405,6 +405,72 @@ public static class AdminEndpoints
             return Results.NoContent();
         });
 
+        // ---- Billing plans CRUD ----
+        group.MapGet("/billing-plans", async (ApplicationDbContext db, CancellationToken ct) =>
+        {
+            var rows = await db.BillingPlans.AsNoTracking()
+                .OrderBy(p => p.SortOrder)
+                .Select(p => ToPlanDto(p))
+                .ToListAsync(ct);
+            return Results.Ok(rows);
+        });
+
+        group.MapPost("/billing-plans", async (
+            [FromBody] BillingPlanUpsertRequest request,
+            ApplicationDbContext db,
+            IAuditLogger audit,
+            ClaimsPrincipal principal,
+            HttpContext http,
+            CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.Name) || string.IsNullOrWhiteSpace(request.StripePriceId))
+                return Results.BadRequest(new { error = "Name and Stripe price id are required." });
+
+            var p = ApplyPlan(new BillingPlan(), request);
+            db.BillingPlans.Add(p);
+            await db.SaveChangesAsync(ct);
+            await EnsureSingleFeatured(db, p, ct);
+            await audit.LogAsync(AdminEmail(principal), "plan.create", p.Name, ClientIp(http), ct);
+            return Results.Ok(ToPlanDto(p));
+        });
+
+        group.MapPut("/billing-plans/{id:int}", async (
+            int id,
+            [FromBody] BillingPlanUpsertRequest request,
+            ApplicationDbContext db,
+            IAuditLogger audit,
+            ClaimsPrincipal principal,
+            HttpContext http,
+            CancellationToken ct) =>
+        {
+            var p = await db.BillingPlans.FirstOrDefaultAsync(x => x.Id == id, ct);
+            if (p is null) return Results.NotFound();
+            if (string.IsNullOrWhiteSpace(request.Name) || string.IsNullOrWhiteSpace(request.StripePriceId))
+                return Results.BadRequest(new { error = "Name and Stripe price id are required." });
+
+            ApplyPlan(p, request);
+            await db.SaveChangesAsync(ct);
+            await EnsureSingleFeatured(db, p, ct);
+            await audit.LogAsync(AdminEmail(principal), "plan.update", p.Name, ClientIp(http), ct);
+            return Results.Ok(ToPlanDto(p));
+        });
+
+        group.MapDelete("/billing-plans/{id:int}", async (
+            int id,
+            ApplicationDbContext db,
+            IAuditLogger audit,
+            ClaimsPrincipal principal,
+            HttpContext http,
+            CancellationToken ct) =>
+        {
+            var p = await db.BillingPlans.FirstOrDefaultAsync(x => x.Id == id, ct);
+            if (p is null) return Results.NotFound();
+            db.BillingPlans.Remove(p);
+            await db.SaveChangesAsync(ct);
+            await audit.LogAsync(AdminEmail(principal), "plan.delete", p.Name, ClientIp(http), ct);
+            return Results.NoContent();
+        });
+
         // ---- Asset uploads ----
         group.MapPost("/assets", async (
             HttpRequest req,
@@ -500,7 +566,7 @@ public static class AdminEndpoints
         Id = u.Id,
         Email = u.Email,
         SubscriptionStatus = u.SubscriptionStatus,
-        IsPro = string.Equals(u.SubscriptionStatus, "active", StringComparison.OrdinalIgnoreCase),
+        IsPro = u.IsLifetime || string.Equals(u.SubscriptionStatus, "active", StringComparison.OrdinalIgnoreCase),
         SubscriptionEndDate = u.SubscriptionEndDate,
         FreeExportsUsed = u.FreeExportsUsed,
         TotalExports = u.TotalExports,
@@ -521,6 +587,33 @@ public static class AdminEndpoints
         HeadScripts = s.HeadScripts,
         BodyScripts = s.BodyScripts,
         UpdatedAt = s.UpdatedAt,
+    };
+
+    private static BillingPlan ApplyPlan(BillingPlan p, BillingPlanUpsertRequest r)
+    {
+        p.Name = r.Name.Trim();
+        p.StripePriceId = r.StripePriceId.Trim();
+        p.Kind = r.Kind == "lifetime" ? "lifetime" : "subscription";
+        p.PriceLabel = r.PriceLabel ?? "";
+        p.Interval = string.IsNullOrWhiteSpace(r.Interval) ? "month" : r.Interval.Trim();
+        p.Enabled = r.Enabled;
+        p.SortOrder = r.SortOrder;
+        p.Featured = r.Featured;
+        p.MaxRedemptions = r.MaxRedemptions;
+        return p;
+    }
+
+    private static async Task EnsureSingleFeatured(ApplicationDbContext db, BillingPlan p, CancellationToken ct)
+    {
+        if (!p.Featured) return;
+        await db.BillingPlans.Where(x => x.Id != p.Id && x.Featured)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.Featured, false), ct);
+    }
+
+    private static BillingPlanDto ToPlanDto(BillingPlan p) => new()
+    {
+        Id = p.Id, Name = p.Name, StripePriceId = p.StripePriceId, Kind = p.Kind, PriceLabel = p.PriceLabel,
+        Interval = p.Interval, Enabled = p.Enabled, SortOrder = p.SortOrder, Featured = p.Featured, MaxRedemptions = p.MaxRedemptions,
     };
 
     private static bool IsValidJson(string json)

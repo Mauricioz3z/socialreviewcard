@@ -24,6 +24,9 @@ public class ApplicationUser : IdentityUser
     /// </summary>
     public DateTime? SubscriptionEndDate { get; set; }
 
+    /// <summary>True for a one-time "lifetime" purchase — Pro forever, never expires.</summary>
+    public bool IsLifetime { get; set; }
+
     /// <summary>
     /// Free-quota image exports consumed in the current monthly period (see
     /// UsageEndpoints). Resets to 0 at the start of a new calendar month.

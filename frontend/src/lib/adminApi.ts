@@ -273,3 +273,30 @@ export async function adminUploadAsset(token: string, file: File): Promise<Asset
 
 export const adminDeleteAsset = (token: string, name: string) =>
   adminRequest<void>(`/api/admin/assets/${encodeURIComponent(name)}`, token, { method: 'DELETE' });
+
+export interface AdminBillingPlan {
+  id: number;
+  name: string;
+  stripePriceId: string;
+  kind: string; // 'subscription' | 'lifetime'
+  priceLabel: string;
+  interval: string; // 'month' | 'year' | 'once'
+  enabled: boolean;
+  sortOrder: number;
+  featured: boolean;
+  maxRedemptions: number | null;
+}
+
+export type BillingPlanUpsert = Omit<AdminBillingPlan, 'id'>;
+
+export const adminListBillingPlans = (token: string) =>
+  adminRequest<AdminBillingPlan[]>('/api/admin/billing-plans', token);
+
+export const adminCreateBillingPlan = (token: string, body: BillingPlanUpsert) =>
+  adminRequest<AdminBillingPlan>('/api/admin/billing-plans', token, { method: 'POST', body: JSON.stringify(body) });
+
+export const adminUpdateBillingPlan = (token: string, id: number, body: BillingPlanUpsert) =>
+  adminRequest<AdminBillingPlan>(`/api/admin/billing-plans/${id}`, token, { method: 'PUT', body: JSON.stringify(body) });
+
+export const adminDeleteBillingPlan = (token: string, id: number) =>
+  adminRequest<void>(`/api/admin/billing-plans/${id}`, token, { method: 'DELETE' });

@@ -197,10 +197,11 @@ export function deleteCard(token: string, id: string): Promise<void> {
 
 /* ----------------------------- Billing ----------------------------- */
 
-export async function startCheckout(token: string): Promise<string> {
+export async function startCheckout(token: string, planId?: number): Promise<string> {
   const data = await request<{ url: string }>('/api/billing/checkout', {
     method: 'POST',
     token,
+    body: JSON.stringify({ planId: planId ?? null }),
   });
   return data.url;
 }
