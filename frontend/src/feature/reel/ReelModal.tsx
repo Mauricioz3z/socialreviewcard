@@ -2,17 +2,55 @@ import { useEffect, useRef, useState } from 'react';
 import { Clapperboard, Download, Loader2, X } from 'lucide-react';
 import { exportReel } from './export/exportReel';
 import { bohoBotanicalV1 } from './theme/presets';
-import { createThemeScene, loadThemeAssets } from './theme/themeScene';
+import { createThemeScene, loadThemeAssets, type CardLayers } from './theme/themeScene';
 import type { ReelTheme } from './theme/schema';
 
 type Status = 'loading' | 'idle' | 'recording' | 'transcoding' | 'done' | 'error';
 
+async function bmpFromUrl(url: string): Promise<ImageBitmap> {
+  const blob = await (await fetch(url)).blob();
+  return createImageBitmap(blob);
+}
+
+/** Bounding-box centroid of the opaque pixels (used to pop the stars in place). */
+function alphaCentroid(bmp: ImageBitmap): { x: number; y: number } | null {
+  const c = document.createElement('canvas');
+  c.width = bmp.width;
+  c.height = bmp.height;
+  const cx = c.getContext('2d');
+  if (!cx) return null;
+  cx.drawImage(bmp, 0, 0);
+  let data: Uint8ClampedArray;
+  try {
+    data = cx.getImageData(0, 0, c.width, c.height).data;
+  } catch {
+    return null;
+  }
+  let minX = c.width;
+  let minY = c.height;
+  let maxX = 0;
+  let maxY = 0;
+  let found = false;
+  for (let y = 0; y < c.height; y += 2) {
+    for (let x = 0; x < c.width; x += 2) {
+      if (data[(y * c.width + x) * 4 + 3] > 12) {
+        found = true;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  return found ? { x: (minX + maxX) / 2, y: (minY + maxY) / 2 } : null;
+}
+
 export function ReelModal({
-  cardImageUrl,
+  layers,
   onClose,
   theme = bohoBotanicalV1,
 }: {
-  cardImageUrl: string;
+  layers: { base: string; stars: string; text: string };
   onClose: () => void;
   theme?: ReelTheme;
 }) {
@@ -22,7 +60,7 @@ export function ReelModal({
   const FPS = theme.fps ?? 30;
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const bitmapRef = useRef<ImageBitmap | null>(null);
+  const cardRef = useRef<CardLayers | null>(null);
   const assetsRef = useRef<Record<string, HTMLImageElement>>({});
   const rafRef = useRef<number | null>(null);
 
@@ -40,19 +78,21 @@ export function ReelModal({
     let cancelled = false;
     (async () => {
       try {
-        const [blob, assets] = await Promise.all([
-          fetch(cardImageUrl).then((r) => r.blob()),
+        const [assets, base, stars, text] = await Promise.all([
           loadThemeAssets(theme),
+          bmpFromUrl(layers.base),
+          bmpFromUrl(layers.stars),
+          bmpFromUrl(layers.text),
         ]);
-        const bmp = await createImageBitmap(blob);
         if (cancelled) return;
-        bitmapRef.current = bmp;
+        const card: CardLayers = { base, stars, text, starsCenter: alphaCentroid(stars) };
+        cardRef.current = card;
         assetsRef.current = assets;
         setStatus('idle');
 
         const ctx = canvasRef.current?.getContext('2d');
         if (!ctx) return;
-        const scene = createThemeScene(ctx, theme, bmp, assets);
+        const scene = createThemeScene(ctx, theme, card, assets);
         const start = performance.now();
         const loop = (now: number) => {
           scene((now - start) % DURATION);
@@ -67,18 +107,18 @@ export function ReelModal({
       cancelled = true;
       stopPreview();
     };
-  }, [cardImageUrl, theme]);
+  }, [layers, theme]);
 
   const onExport = async () => {
     const canvas = canvasRef.current;
-    const bmp = bitmapRef.current;
+    const card = cardRef.current;
     const ctx = canvas?.getContext('2d');
-    if (!canvas || !bmp || !ctx) return;
+    if (!canvas || !card || !ctx) return;
 
     stopPreview();
     setProgress(0);
     setStatus('recording');
-    const scene = createThemeScene(ctx, theme, bmp, assetsRef.current);
+    const scene = createThemeScene(ctx, theme, card, assetsRef.current);
     try {
       const out = await exportReel({
         canvas,

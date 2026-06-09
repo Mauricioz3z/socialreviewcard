@@ -1,5 +1,14 @@
 import type { BackgroundSpec, ForegroundAsset, ReelTheme, TransformOrigin } from './schema';
 
+/** The card rasterized into independently-animatable layers. */
+export interface CardLayers {
+  base: ImageBitmap; // container + platform + footer (no stars/text)
+  stars?: ImageBitmap | null;
+  text?: ImageBitmap | null;
+  /** Centroid of the stars (in base-bitmap px) so the pop scales in place. */
+  starsCenter?: { x: number; y: number } | null;
+}
+
 /* ----------------------------- timing primitives ----------------------------- */
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 const easeOutCubic = (x: number) => 1 - Math.pow(1 - x, 3);
@@ -114,13 +123,13 @@ function paintAsset(
 export function createThemeScene(
   ctx: CanvasRenderingContext2D,
   theme: ReelTheme,
-  card: ImageBitmap,
+  layers: CardLayers,
   assets: Record<string, HTMLImageElement>,
 ) {
   const W = theme.dimensions.width;
   const H = theme.dimensions.height;
   const fit = (theme.cardContainer.fitScale ?? 0.82);
-  const baseFit = Math.min((W * fit) / card.width, (H * fit) / card.height);
+  const baseFit = Math.min((W * fit) / layers.base.width, (H * fit) / layers.base.height);
   const behind = (theme.foregroundAssets ?? []).filter((a) => (a.layer ?? 'behind-card') === 'behind-card');
   const front = (theme.foregroundAssets ?? []).filter((a) => a.layer === 'front-card');
   const cc = theme.cardContainer;
@@ -154,17 +163,54 @@ export function createThemeScene(
 
     const scale = baseFit * entranceScale * parallax;
     if (scale > 0.0001 && alpha > 0.001) {
-      const cw = card.width * scale;
-      const ch = card.height * scale;
+      const bw = layers.base.width;
+      const bh = layers.base.height;
+      ctx.save();
+      ctx.translate(W / 2, H / 2 + offsetY);
+      ctx.scale(scale, scale); // work in card-local pixels so layers stay aligned
+
+      // base (with shadow)
       ctx.save();
       ctx.globalAlpha = alpha;
-      ctx.translate(W / 2, H / 2 + offsetY);
       if (cc.shadow !== false) {
         ctx.shadowColor = 'rgba(0,0,0,0.28)';
-        ctx.shadowBlur = 60;
-        ctx.shadowOffsetY = 28;
+        ctx.shadowBlur = 60 / scale;
+        ctx.shadowOffsetY = 28 / scale;
       }
-      ctx.drawImage(card, -cw / 2, -ch / 2, cw, ch);
+      ctx.drawImage(layers.base, -bw / 2, -bh / 2);
+      ctx.restore();
+
+      // stars — staggered group "pop" scaling in place
+      const sr = theme.contentTimeline?.starsReveal;
+      if (layers.stars) {
+        const sp = sr ? stepProgress(tMs, sr.delayMs, sr.durationMs ?? 450) : 1;
+        if (sp > 0) {
+          const pop = sr ? backOut(sp) : 1;
+          const cx = (layers.starsCenter?.x ?? bw / 2) - bw / 2;
+          const cy = (layers.starsCenter?.y ?? bh / 2) - bh / 2;
+          ctx.save();
+          ctx.globalAlpha = alpha * clamp01(sp * 1.6);
+          ctx.translate(cx, cy);
+          ctx.scale(pop, pop);
+          ctx.translate(-cx, -cy);
+          ctx.drawImage(layers.stars, -bw / 2, -bh / 2);
+          ctx.restore();
+        }
+      }
+
+      // text — fade + slide up
+      const tr = theme.contentTimeline?.textReveal;
+      if (layers.text) {
+        const tp = tr ? easeOutCubic(stepProgress(tMs, tr.delayMs, tr.durationMs ?? 700)) : 1;
+        if (tp > 0) {
+          ctx.save();
+          ctx.globalAlpha = alpha * tp;
+          ctx.translate(0, (1 - tp) * 46);
+          ctx.drawImage(layers.text, -bw / 2, -bh / 2);
+          ctx.restore();
+        }
+      }
+
       ctx.restore();
     }
 

@@ -134,9 +134,12 @@ export default function App() {
   const [config, setConfig] = useState<PublicConfig | null>(null);
   const [showMobilePreview, setShowMobilePreview] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
-  const [reelImageUrl, setReelImageUrl] = useState<string | null>(null);
+  const [reelLayers, setReelLayers] = useState<{ base: string; stars: string; text: string } | null>(null);
 
   const captureRef = useRef<HTMLDivElement>(null);
+  const reelBaseRef = useRef<HTMLDivElement>(null);
+  const reelStarsRef = useRef<HTMLDivElement>(null);
+  const reelTextRef = useRef<HTMLDivElement>(null);
 
   const subscription: 'free' | 'pro' = usage?.isPro ? 'pro' : 'free';
   const bg = BACKGROUNDS.find((b) => b.id === bgId)!;
@@ -373,8 +376,7 @@ export default function App() {
   // Rasterizes the hidden full-res node with the browser's own engine (SVG
   // foreignObject) so fonts, letter-spacing and wrapping match the preview.
   // Web fonts are awaited first or the export falls back to a wider system font.
-  const renderPng = async (): Promise<string> => {
-    const node = captureRef.current;
+  const renderNode = async (node: HTMLElement | null): Promise<string> => {
     if (!node) throw new Error('Nothing to export');
     if (document.fonts) {
       await Promise.all([
@@ -386,6 +388,8 @@ export default function App() {
     }
     return toPng(node, { pixelRatio: 2, cacheBust: true, width: node.offsetWidth, height: node.offsetHeight });
   };
+
+  const renderPng = () => renderNode(captureRef.current);
 
   const downloadPng = (dataUrl: string) => {
     const link = document.createElement('a');
@@ -502,7 +506,12 @@ export default function App() {
       return;
     }
     try {
-      setReelImageUrl(await renderPng());
+      const [base, stars, text] = await Promise.all([
+        renderNode(reelBaseRef.current),
+        renderNode(reelStarsRef.current),
+        renderNode(reelTextRef.current),
+      ]);
+      setReelLayers({ base, stars, text });
     } catch {
       showToast('Could not prepare', 'We could not render the card. Try again.', 'error');
     }
@@ -924,6 +933,13 @@ export default function App() {
         <CardCanvas ref={captureRef} data={data} bg={bg} grain={grain} platform={platformDisplay} watermark={watermark} />
       </div>
 
+      {/* hidden layered nodes for the animated-video export (base / stars / text) */}
+      <div style={{ position: 'fixed', left: -100000, top: 0, pointerEvents: 'none' }} aria-hidden>
+        <CardCanvas ref={reelBaseRef} data={data} bg={bg} grain={grain} platform={platformDisplay} watermark={null} layer="base" />
+        <CardCanvas ref={reelStarsRef} data={data} bg={bg} grain={grain} platform={platformDisplay} watermark={null} layer="stars" />
+        <CardCanvas ref={reelTextRef} data={data} bg={bg} grain={grain} platform={platformDisplay} watermark={null} layer="text" />
+      </div>
+
       {/* ============ SAVED CARDS DRAWER ============ */}
       {showCards && (
         <SavedCardsDrawer
@@ -985,7 +1001,7 @@ export default function App() {
       )}
 
       {/* ============ REEL (animated video) ============ */}
-      {reelImageUrl && <ReelModal cardImageUrl={reelImageUrl} onClose={() => setReelImageUrl(null)} />}
+      {reelLayers && <ReelModal layers={reelLayers} onClose={() => setReelLayers(null)} />}
 
       {/* ============ TOAST ============ */}
       {toast && (

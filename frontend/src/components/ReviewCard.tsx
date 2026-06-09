@@ -61,10 +61,28 @@ const THEMES: Record<CardStyleId, StyleTheme> = {
   },
 };
 
-export function ReviewCard({ data, platform: plat }: { data: CardData; platform: PlatformDisplay }) {
+/** When set, renders only part of the card (for layered video animation). Other
+ *  parts keep their space via visibility:hidden so all layers stay pixel-aligned. */
+export type CardLayer = 'full' | 'base' | 'stars' | 'text';
+
+export function ReviewCard({
+  data,
+  platform: plat,
+  layer = 'full',
+}: {
+  data: CardData;
+  platform: PlatformDisplay;
+  layer?: CardLayer;
+}) {
   const { review, name, rating, avatar, cardStyle, font, ratio } = data;
   const compact = ratio === 'square';
   const fontFamily = font === 'serif' ? 'Newsreader, serif' : '"Plus Jakarta Sans", sans-serif';
+
+  const showRest = layer === 'full' || layer === 'base';
+  const showStars = layer === 'full' || layer === 'stars';
+  const showText = layer === 'full' || layer === 'text';
+  const transparent = layer === 'stars' || layer === 'text';
+  const hide = (visible: boolean) => (visible ? {} : { visibility: 'hidden' as const });
 
   const initials =
     (name || '')
@@ -91,11 +109,11 @@ export function ReviewCard({ data, platform: plat }: { data: CardData; platform:
 
   return (
     <div
-      className={'relative flex flex-col ' + S.card + ' ' + pad}
-      style={{ width: '100%', height: '100%', fontFamily, ...brutalShadow }}
+      className={'relative flex flex-col ' + (transparent ? '' : S.card) + ' ' + pad}
+      style={{ width: '100%', height: '100%', fontFamily, ...(transparent ? {} : brutalShadow) }}
     >
       {/* Header: platform pill */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between" style={hide(showRest)}>
         <div
           className={
             'inline-flex items-center gap-2 rounded-full pl-2 pr-3.5 py-1.5 text-[13px] font-semibold ' +
@@ -124,7 +142,7 @@ export function ReviewCard({ data, platform: plat }: { data: CardData; platform:
 
       {/* Middle: stars + quote */}
       <div className="flex-1 flex flex-col justify-center py-6">
-        <div className="flex items-center gap-1 mb-5">
+        <div className="flex items-center gap-1 mb-5" style={hide(showStars)}>
           {[1, 2, 3, 4, 5].map((i) => (
             <Star
               key={i}
@@ -136,7 +154,7 @@ export function ReviewCard({ data, platform: plat }: { data: CardData; platform:
           ))}
         </div>
 
-        <div className="relative">
+        <div className="relative" style={hide(showText)}>
           {font === 'serif' && (
             <span
               className="absolute -top-6 -left-1 leading-none select-none"
@@ -165,6 +183,7 @@ export function ReviewCard({ data, platform: plat }: { data: CardData; platform:
         style={{
           borderTop:
             cardStyle === 'brutal' ? '3px solid ' + S.divider : '1px solid ' + S.divider,
+          ...hide(showRest),
         }}
       >
         <div

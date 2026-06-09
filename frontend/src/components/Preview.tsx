@@ -1,5 +1,5 @@
 import { forwardRef, useLayoutEffect, useRef, useState } from 'react';
-import { ReviewCard } from './ReviewCard';
+import { ReviewCard, type CardLayer } from './ReviewCard';
 import { NOISE, RATIOS, type BackgroundConfig } from '../lib/config';
 import type { CardData, PlatformDisplay } from '../types';
 
@@ -11,6 +11,8 @@ interface CanvasProps {
   platform: PlatformDisplay;
   /** When set, stamps a repeating diagonal watermark (free plan). */
   watermark?: string | null;
+  /** Renders a single layer (transparent for stars/text) for video animation. */
+  layer?: CardLayer;
 }
 
 const escapeXml = (s: string) =>
@@ -62,9 +64,11 @@ function Watermark({ text }: { text: string }) {
  * The full-resolution card canvas (background + blooms + grain + card) rendered
  * at its natural pixel dimensions with no transform — ideal for image export.
  */
-export const CardCanvas = forwardRef<HTMLDivElement, CanvasProps>(({ data, bg, grain, platform, watermark }, ref) => {
+export const CardCanvas = forwardRef<HTMLDivElement, CanvasProps>(({ data, bg, grain, platform, watermark, layer }, ref) => {
   const ratio = RATIOS[data.ratio];
   const inset = data.ratio === 'square' ? 30 : 28;
+  // Stars/text layers render fully transparent so they stack over the base.
+  const transparent = layer === 'stars' || layer === 'text';
 
   return (
     <div
@@ -73,13 +77,13 @@ export const CardCanvas = forwardRef<HTMLDivElement, CanvasProps>(({ data, bg, g
       style={{
         width: ratio.w,
         height: ratio.h,
-        background: bg.css,
+        background: transparent ? 'transparent' : bg.css,
         borderRadius: 18,
-        boxShadow: '0 40px 120px -30px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04)',
+        boxShadow: transparent ? 'none' : '0 40px 120px -30px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04)',
       }}
     >
       {/* soft light blooms for gradient depth */}
-      {bg.type === 'gradient' && (
+      {!transparent && bg.type === 'gradient' && (
         <>
           <div
             className="absolute rounded-full"
@@ -103,7 +107,7 @@ export const CardCanvas = forwardRef<HTMLDivElement, CanvasProps>(({ data, bg, g
           />
         </>
       )}
-      {grain && (
+      {!transparent && grain && (
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
@@ -115,9 +119,9 @@ export const CardCanvas = forwardRef<HTMLDivElement, CanvasProps>(({ data, bg, g
         />
       )}
       <div className="absolute" style={{ inset }}>
-        <ReviewCard data={data} platform={platform} />
+        <ReviewCard data={data} platform={platform} layer={layer} />
       </div>
-      {watermark && <Watermark text={watermark} />}
+      {!transparent && watermark && <Watermark text={watermark} />}
     </div>
   );
 });
