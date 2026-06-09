@@ -4,6 +4,7 @@ import { exportReel } from './export/exportReel';
 import { bohoBotanicalV1 } from './theme/presets';
 import { createThemeScene, loadThemeAssets, type CardLayers } from './theme/themeScene';
 import type { ReelTheme } from './theme/schema';
+import { userSceneToTheme, type UserScene } from './userScene';
 import { getReelThemes } from '../../lib/api';
 
 type Status = 'loading' | 'idle' | 'recording' | 'transcoding' | 'done' | 'error';
@@ -102,16 +103,18 @@ function starRectsFromBitmap(bmp: ImageBitmap): { x: number; y: number; w: numbe
 
 export function ReelModal({
   layers,
+  scene = null,
   onClose,
 }: {
   layers: { base: string; stars: string; text: string; wordRects: { x: number; y: number; w: number; h: number }[] };
+  scene?: UserScene | null;
   onClose: () => void;
 }) {
-  const [themes, setThemes] = useState<ReelTheme[]>([bohoBotanicalV1]);
+  const [themes, setThemes] = useState<ReelTheme[]>(scene ? [userSceneToTheme(scene)] : [bohoBotanicalV1]);
   const [activeIdx, setActiveIdx] = useState(0);
   const theme = themes[activeIdx] ?? bohoBotanicalV1;
 
-  // Pull admin-managed themes; fall back to the built-in preset.
+  // The user's composed scene (if any) goes first; then admin-managed themes.
   useEffect(() => {
     getReelThemes()
       .then((list) => {
@@ -124,13 +127,16 @@ export function ReelModal({
             }
           })
           .filter((x): x is ReelTheme => !!x);
-        if (parsed.length) {
-          setThemes(parsed);
-          setActiveIdx(0);
-        }
+        const merged = scene
+          ? [userSceneToTheme(scene), ...parsed]
+          : parsed.length
+            ? parsed
+            : [bohoBotanicalV1];
+        setThemes(merged);
+        setActiveIdx(0);
       })
       .catch(() => {});
-  }, []);
+  }, [scene]);
 
   const W = theme.dimensions.width;
   const H = theme.dimensions.height;

@@ -60,6 +60,18 @@ public static class ConfigEndpoints
         .AllowAnonymous()
         .WithTags("Config");
 
+        // GET /api/assets -> curated decorative asset gallery for the scene composer.
+        routes.MapGet("/api/assets", (Services.UploadStore store) =>
+        {
+            if (!Directory.Exists(store.Root)) return Results.Ok(Array.Empty<object>());
+            var files = new DirectoryInfo(store.Root).GetFiles()
+                .OrderBy(f => f.Name)
+                .Select(f => new { name = f.Name, url = "/uploads/" + f.Name });
+            return Results.Ok(files);
+        })
+        .AllowAnonymous()
+        .WithTags("Config");
+
         return routes;
     }
 

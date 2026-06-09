@@ -146,6 +146,11 @@ export function getReelThemes(): Promise<PublicReelTheme[]> {
   return request<PublicReelTheme[]>('/api/reel-themes', { method: 'GET' });
 }
 
+/** Curated decorative assets for the scene composer. */
+export function getAssets(): Promise<{ name: string; url: string }[]> {
+  return request<{ name: string; url: string }[]>('/api/assets', { method: 'GET' });
+}
+
 export type FeedbackType = 'suggestion' | 'criticism' | 'support';
 
 /** Submits an in-app feedback/support message. Token is optional (captured if signed in). */

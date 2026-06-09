@@ -32,6 +32,8 @@ import { Preview, CardCanvas } from './components/Preview';
 import { Field, Section, Segmented, StyleSwatch, Toggle } from './components/ui';
 import { AuthModal } from './components/AuthModal';
 import { ReelModal } from './feature/reel/ReelModal';
+import { SceneComposer } from './feature/reel/SceneComposer';
+import type { UserScene } from './feature/reel/userScene';
 import { BACKGROUNDS, CARD_STYLES, DEFAULT_PLATFORMS, resolvePlatform, RATIOS } from './lib/config';
 import { PlatformIcon } from './lib/platformIcon';
 import {
@@ -140,6 +142,8 @@ export default function App() {
     text: string;
     wordRects: { x: number; y: number; w: number; h: number }[];
   } | null>(null);
+  const [scene, setScene] = useState<UserScene | null>(null);
+  const [composeUrl, setComposeUrl] = useState<string | null>(null);
 
   const captureRef = useRef<HTMLDivElement>(null);
   const reelBaseRef = useRef<HTMLDivElement>(null);
@@ -149,7 +153,7 @@ export default function App() {
   const subscription: 'free' | 'pro' = usage?.isPro ? 'pro' : 'free';
   const bg = BACKGROUNDS.find((b) => b.id === bgId)!;
   const data: CardData = { review, name, platform, rating, avatar, cardStyle, font, ratio };
-  const styles = { avatar, cardStyle, font, ratio, background: bgId, grain };
+  const styles = { avatar, cardStyle, font, ratio, background: bgId, grain, scene };
 
   // Free-plan exports get a watermark; Pro accounts never do.
   const watermark =
@@ -337,6 +341,7 @@ export default function App() {
       if (s.ratio) setRatio(s.ratio);
       if (s.background && BACKGROUNDS.some((b) => b.id === s.background)) setBgId(s.background);
       if (typeof s.grain === 'boolean') setGrain(s.grain);
+      setScene(s.scene ?? null);
     } catch {
       /* styling JSON malformed — keep current styling */
     }
@@ -536,6 +541,15 @@ export default function App() {
       setReelLayers({ base, stars, text, wordRects });
     } catch {
       showToast('Could not prepare', 'We could not render the card. Try again.', 'error');
+    }
+  };
+
+  // Open the visual scene composer (uses a full render of the card as backdrop).
+  const openCompose = async () => {
+    try {
+      setComposeUrl(await renderPng());
+    } catch {
+      showToast('Could not open the composer', 'Try again.', 'error');
     }
   };
 
@@ -868,6 +882,12 @@ export default function App() {
             <span className="text-[10px] font-bold uppercase tracking-wide bg-accent text-white px-1.5 py-0.5 rounded">Beta</span>
           </button>
           <button
+            onClick={openCompose}
+            className="w-full flex items-center justify-center gap-2 h-10 rounded-xl text-accent text-[12.5px] font-semibold transition-all hover:bg-accent-soft active:scale-[0.99]"
+          >
+            <Sparkle size={15} strokeWidth={2.2} /> Customize animation{scene ? ' · edited' : ''}
+          </button>
+          <button
             onClick={onSave}
             disabled={saving}
             className="w-full flex items-center justify-center gap-2 h-11 rounded-xl border border-zinc-200 bg-white text-zinc-800 text-[13.5px] font-semibold transition-all hover:border-zinc-300 active:scale-[0.99] disabled:opacity-70"
@@ -1023,7 +1043,17 @@ export default function App() {
       )}
 
       {/* ============ REEL (animated video) ============ */}
-      {reelLayers && <ReelModal layers={reelLayers} onClose={() => setReelLayers(null)} />}
+      {reelLayers && <ReelModal layers={reelLayers} scene={scene} onClose={() => setReelLayers(null)} />}
+
+      {/* ============ SCENE COMPOSER ============ */}
+      {composeUrl && (
+        <SceneComposer
+          cardImageUrl={composeUrl}
+          initial={scene}
+          onSave={setScene}
+          onClose={() => setComposeUrl(null)}
+        />
+      )}
 
       {/* ============ TOAST ============ */}
       {toast && (
