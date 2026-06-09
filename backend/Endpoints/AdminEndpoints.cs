@@ -330,6 +330,81 @@ public static class AdminEndpoints
             return Results.NoContent();
         });
 
+        // ---- Reel themes CRUD ----
+        group.MapGet("/reel-themes", async (ApplicationDbContext db, CancellationToken ct) =>
+        {
+            var rows = await db.ReelThemes.AsNoTracking()
+                .OrderBy(t => t.SortOrder)
+                .Select(t => new ReelThemeDto { Id = t.Id, Name = t.Name, Json = t.Json, Enabled = t.Enabled, SortOrder = t.SortOrder })
+                .ToListAsync(ct);
+            return Results.Ok(rows);
+        });
+
+        group.MapPost("/reel-themes", async (
+            [FromBody] ReelThemeUpsertRequest request,
+            ApplicationDbContext db,
+            IAuditLogger audit,
+            ClaimsPrincipal principal,
+            HttpContext http,
+            CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.Name)) return Results.BadRequest(new { error = "Name is required." });
+            if (!IsValidJson(request.Json)) return Results.BadRequest(new { error = "Theme JSON is invalid." });
+
+            var t = new ReelTheme
+            {
+                Name = request.Name.Trim(),
+                Json = request.Json,
+                Enabled = request.Enabled,
+                SortOrder = request.SortOrder,
+                UpdatedAt = DateTime.UtcNow,
+            };
+            db.ReelThemes.Add(t);
+            await db.SaveChangesAsync(ct);
+            await audit.LogAsync(AdminEmail(principal), "reeltheme.create", t.Name, ClientIp(http), ct);
+            return Results.Ok(new ReelThemeDto { Id = t.Id, Name = t.Name, Json = t.Json, Enabled = t.Enabled, SortOrder = t.SortOrder });
+        });
+
+        group.MapPut("/reel-themes/{id:int}", async (
+            int id,
+            [FromBody] ReelThemeUpsertRequest request,
+            ApplicationDbContext db,
+            IAuditLogger audit,
+            ClaimsPrincipal principal,
+            HttpContext http,
+            CancellationToken ct) =>
+        {
+            var t = await db.ReelThemes.FirstOrDefaultAsync(x => x.Id == id, ct);
+            if (t is null) return Results.NotFound();
+            if (string.IsNullOrWhiteSpace(request.Name)) return Results.BadRequest(new { error = "Name is required." });
+            if (!IsValidJson(request.Json)) return Results.BadRequest(new { error = "Theme JSON is invalid." });
+
+            t.Name = request.Name.Trim();
+            t.Json = request.Json;
+            t.Enabled = request.Enabled;
+            t.SortOrder = request.SortOrder;
+            t.UpdatedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync(ct);
+            await audit.LogAsync(AdminEmail(principal), "reeltheme.update", t.Name, ClientIp(http), ct);
+            return Results.Ok(new ReelThemeDto { Id = t.Id, Name = t.Name, Json = t.Json, Enabled = t.Enabled, SortOrder = t.SortOrder });
+        });
+
+        group.MapDelete("/reel-themes/{id:int}", async (
+            int id,
+            ApplicationDbContext db,
+            IAuditLogger audit,
+            ClaimsPrincipal principal,
+            HttpContext http,
+            CancellationToken ct) =>
+        {
+            var t = await db.ReelThemes.FirstOrDefaultAsync(x => x.Id == id, ct);
+            if (t is null) return Results.NotFound();
+            db.ReelThemes.Remove(t);
+            await db.SaveChangesAsync(ct);
+            await audit.LogAsync(AdminEmail(principal), "reeltheme.delete", t.Name, ClientIp(http), ct);
+            return Results.NoContent();
+        });
+
         // GET /api/admin/audit?skip=&take=
         group.MapGet("/audit", async (ApplicationDbContext db, int skip, int take, CancellationToken ct) =>
         {
@@ -398,6 +473,20 @@ public static class AdminEndpoints
         BodyScripts = s.BodyScripts,
         UpdatedAt = s.UpdatedAt,
     };
+
+    private static bool IsValidJson(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return false;
+        try
+        {
+            using var _ = JsonDocument.Parse(json);
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
 
     private static string AdminEmail(ClaimsPrincipal principal) =>
         principal.FindFirstValue(ClaimTypes.Email) ?? principal.Identity?.Name ?? "admin";

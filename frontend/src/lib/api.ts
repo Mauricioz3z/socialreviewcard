@@ -135,6 +135,17 @@ export function getConfig(): Promise<PublicConfig> {
   return request<PublicConfig>('/api/config', { method: 'GET' });
 }
 
+export interface PublicReelTheme {
+  id: number;
+  name: string;
+  json: string;
+}
+
+/** Enabled animation themes for the video studio. */
+export function getReelThemes(): Promise<PublicReelTheme[]> {
+  return request<PublicReelTheme[]>('/api/reel-themes', { method: 'GET' });
+}
+
 export type FeedbackType = 'suggestion' | 'criticism' | 'support';
 
 /** Submits an in-app feedback/support message. Token is optional (captured if signed in). */

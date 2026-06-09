@@ -140,6 +140,16 @@ export interface AdminPlatform {
 
 export type PlatformUpsert = Omit<AdminPlatform, 'id'>;
 
+export interface AdminReelTheme {
+  id: number;
+  name: string;
+  json: string;
+  enabled: boolean;
+  sortOrder: number;
+}
+
+export type ReelThemeUpsert = Omit<AdminReelTheme, 'id'>;
+
 /* ----------------------------- Auth ----------------------------- */
 
 interface TokenResponse {
@@ -219,3 +229,15 @@ export const adminUpdatePlatform = (token: string, id: number, body: PlatformUps
 
 export const adminDeletePlatform = (token: string, id: number) =>
   adminRequest<void>(`/api/admin/platforms/${id}`, token, { method: 'DELETE' });
+
+export const adminListReelThemes = (token: string) =>
+  adminRequest<AdminReelTheme[]>('/api/admin/reel-themes', token);
+
+export const adminCreateReelTheme = (token: string, body: ReelThemeUpsert) =>
+  adminRequest<AdminReelTheme>('/api/admin/reel-themes', token, { method: 'POST', body: JSON.stringify(body) });
+
+export const adminUpdateReelTheme = (token: string, id: number, body: ReelThemeUpsert) =>
+  adminRequest<AdminReelTheme>(`/api/admin/reel-themes/${id}`, token, { method: 'PUT', body: JSON.stringify(body) });
+
+export const adminDeleteReelTheme = (token: string, id: number) =>
+  adminRequest<void>(`/api/admin/reel-themes/${id}`, token, { method: 'DELETE' });

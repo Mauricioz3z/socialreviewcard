@@ -4,6 +4,7 @@ import { exportReel } from './export/exportReel';
 import { bohoBotanicalV1 } from './theme/presets';
 import { createThemeScene, loadThemeAssets, type CardLayers } from './theme/themeScene';
 import type { ReelTheme } from './theme/schema';
+import { getReelThemes } from '../../lib/api';
 
 type Status = 'loading' | 'idle' | 'recording' | 'transcoding' | 'done' | 'error';
 
@@ -102,12 +103,35 @@ function starRectsFromBitmap(bmp: ImageBitmap): { x: number; y: number; w: numbe
 export function ReelModal({
   layers,
   onClose,
-  theme = bohoBotanicalV1,
 }: {
   layers: { base: string; stars: string; text: string; wordRects: { x: number; y: number; w: number; h: number }[] };
   onClose: () => void;
-  theme?: ReelTheme;
 }) {
+  const [themes, setThemes] = useState<ReelTheme[]>([bohoBotanicalV1]);
+  const [activeIdx, setActiveIdx] = useState(0);
+  const theme = themes[activeIdx] ?? bohoBotanicalV1;
+
+  // Pull admin-managed themes; fall back to the built-in preset.
+  useEffect(() => {
+    getReelThemes()
+      .then((list) => {
+        const parsed = list
+          .map((t) => {
+            try {
+              return JSON.parse(t.json) as ReelTheme;
+            } catch {
+              return null;
+            }
+          })
+          .filter((x): x is ReelTheme => !!x);
+        if (parsed.length) {
+          setThemes(parsed);
+          setActiveIdx(0);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const W = theme.dimensions.width;
   const H = theme.dimensions.height;
   const DURATION = theme.totalDurationMs;
@@ -237,9 +261,29 @@ export function ReelModal({
               <X size={18} />
             </button>
           </div>
-          <p className="text-[13px] text-zinc-500 mb-5">
-            A 6-second vertical clip (1080×1920) ready for Reels and Stories — rendered on your device.
+          <p className="text-[13px] text-zinc-500 mb-4">
+            A {Math.round(DURATION / 1000)}s vertical clip ({W}×{H}) ready for Reels and Stories — rendered on your device.
           </p>
+
+          {themes.length > 1 && !result && (
+            <div className="flex flex-wrap gap-1.5 mb-5">
+              {themes.map((t, i) => (
+                <button
+                  key={i}
+                  onClick={() => setActiveIdx(i)}
+                  disabled={busy}
+                  className={
+                    'px-3 py-1.5 rounded-full text-[12px] font-semibold border transition disabled:opacity-50 ' +
+                    (i === activeIdx
+                      ? 'border-accent bg-accent-soft text-accent'
+                      : 'border-zinc-200 text-zinc-600 hover:border-zinc-300')
+                  }
+                >
+                  {t.name ?? `Theme ${i + 1}`}
+                </button>
+              ))}
+            </div>
+          )}
 
           {status === 'loading' && (
             <div className="flex items-center gap-2 text-[13px] text-zinc-500">

@@ -4,6 +4,7 @@ import {
   BarChart3,
   Code2,
   Check,
+  Clapperboard,
   Crown,
   Droplet,
   Loader2,
@@ -32,6 +33,10 @@ import {
   adminCreatePlatform,
   adminUpdatePlatform,
   adminDeletePlatform,
+  adminListReelThemes,
+  adminCreateReelTheme,
+  adminUpdateReelTheme,
+  adminDeleteReelTheme,
   adminMarkFeedback,
   adminPutSettings,
   adminRefresh,
@@ -40,6 +45,7 @@ import {
   saveAdminSession,
   type AdminMetrics,
   type AdminPlatform,
+  type AdminReelTheme,
   type AdminSession,
   type AdminSettings,
   type AdminUser,
@@ -51,6 +57,7 @@ type Tab =
   | 'dashboard'
   | 'users'
   | 'platforms'
+  | 'reel-themes'
   | 'monetization'
   | 'watermark'
   | 'scripts'
@@ -182,6 +189,7 @@ function AdminShell({
     { id: 'dashboard', label: 'Dashboard', Icon: BarChart3 },
     { id: 'users', label: 'Users', Icon: Users },
     { id: 'platforms', label: 'Platforms', Icon: Store },
+    { id: 'reel-themes', label: 'Reel Themes', Icon: Clapperboard },
     { id: 'monetization', label: 'Monetization', Icon: Crown },
     { id: 'watermark', label: 'Watermark', Icon: Droplet },
     { id: 'scripts', label: 'Scripts', Icon: Code2 },
@@ -230,6 +238,7 @@ function AdminShell({
           {tab === 'dashboard' && <DashboardTab call={call} />}
           {tab === 'users' && <UsersTab call={call} flash={flash} />}
           {tab === 'platforms' && <PlatformsTab call={call} flash={flash} />}
+          {tab === 'reel-themes' && <ReelThemesTab call={call} flash={flash} />}
           {tab === 'monetization' && <MonetizationTab call={call} flash={flash} />}
           {tab === 'watermark' && <WatermarkTab call={call} flash={flash} />}
           {tab === 'scripts' && <ScriptsTab call={call} flash={flash} />}
@@ -799,6 +808,226 @@ function PlatformEditModal({
       </form>
     </div>
   );
+}
+
+/* ====================================================================== */
+/*  Reel themes                                                           */
+/* ====================================================================== */
+function ReelThemesTab({ call, flash }: { call: Caller; flash: Flash }) {
+  const [items, setItems] = useState<AdminReelTheme[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState<AdminReelTheme | 'new' | null>(null);
+
+  const load = () => {
+    setLoading(true);
+    call(adminListReelThemes)
+      .then(setItems)
+      .catch(() => setItems([]))
+      .finally(() => setLoading(false));
+  };
+  useEffect(load, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const remove = async (t: AdminReelTheme) => {
+    if (!confirm(`Delete theme "${t.name}"?`)) return;
+    try {
+      await call((tok) => adminDeleteReelTheme(tok, t.id));
+      flash('Theme deleted');
+      setItems((prev) => prev.filter((x) => x.id !== t.id));
+    } catch {
+      flash('Delete failed', 'err');
+    }
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <h1 className="text-[20px] font-bold tracking-tight">Reel Themes</h1>
+          <p className="text-[13px] text-zinc-500 mt-0.5">Animation templates for the video export (stored as JSON)</p>
+        </div>
+        <button
+          onClick={() => setEditing('new')}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-zinc-900 text-white text-[12.5px] font-semibold"
+        >
+          <Plus size={15} /> Add theme
+        </button>
+      </div>
+
+      {loading ? (
+        <Spinner />
+      ) : (
+        <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
+          <table className="w-full text-[13px]">
+            <thead className="bg-zinc-50 text-zinc-500 text-[11.5px] uppercase tracking-wide">
+              <tr>
+                <th className="text-left font-semibold px-4 py-2.5">Name</th>
+                <th className="text-right font-semibold px-4 py-2.5">Order</th>
+                <th className="text-left font-semibold px-4 py-2.5">Status</th>
+                <th className="px-4 py-2.5"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((t) => (
+                <tr key={t.id} className="border-t border-zinc-100">
+                  <td className="px-4 py-2.5 font-medium">{t.name}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums">{t.sortOrder}</td>
+                  <td className="px-4 py-2.5">
+                    {t.enabled ? (
+                      <span className="text-emerald-600 text-[12px] font-semibold">Enabled</span>
+                    ) : (
+                      <span className="text-zinc-400 text-[12px]">Hidden</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                    <button onClick={() => setEditing(t)} className="text-[12px] font-semibold text-accent hover:underline mr-3">
+                      Edit
+                    </button>
+                    <button onClick={() => remove(t)} className="text-zinc-400 hover:text-red-600">
+                      <Trash2 size={15} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {items.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-4 py-10 text-center text-zinc-400">
+                    No themes yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {editing && (
+        <ReelThemeEditModal
+          theme={editing === 'new' ? null : editing}
+          call={call}
+          flash={flash}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            load();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ReelThemeEditModal({
+  theme,
+  call,
+  flash,
+  onClose,
+  onSaved,
+}: {
+  theme: AdminReelTheme | null;
+  call: Caller;
+  flash: Flash;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [name, setName] = useState(theme?.name ?? '');
+  const [json, setJson] = useState(theme ? prettyJson(theme.json) : '{\n  \n}');
+  const [enabled, setEnabled] = useState(theme?.enabled ?? true);
+  const [sortOrder, setSortOrder] = useState(theme?.sortOrder ?? 0);
+  const [jsonError, setJsonError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || saving) return;
+    let compact: string;
+    try {
+      compact = JSON.stringify(JSON.parse(json));
+    } catch {
+      setJsonError('Invalid JSON — fix it before saving.');
+      return;
+    }
+    setJsonError(null);
+    setSaving(true);
+    const body = { name: name.trim(), json: compact, enabled, sortOrder };
+    try {
+      if (theme) await call((t) => adminUpdateReelTheme(t, theme.id, body));
+      else await call((t) => adminCreateReelTheme(t, body));
+      flash('Theme saved');
+      onSaved();
+    } catch {
+      flash('Save failed', 'err');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" onClick={onClose}>
+      <form
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={save}
+        className="w-full max-w-[640px] bg-white rounded-2xl shadow-2xl p-6 max-h-[92vh] flex flex-col"
+      >
+        <div className="font-bold text-[15px] mb-4">{theme ? 'Edit theme' : 'New theme'}</div>
+
+        <div className="flex gap-3 mb-3">
+          <div className="flex-1">
+            <label className="block text-[12px] text-zinc-500 mb-1">Name</label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoFocus
+              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-[13px] outline-none focus:border-accent"
+            />
+          </div>
+          <div className="w-24">
+            <label className="block text-[12px] text-zinc-500 mb-1">Order</label>
+            <input
+              type="number"
+              value={sortOrder}
+              onChange={(e) => setSortOrder(Number(e.target.value))}
+              className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-[13px] outline-none focus:border-accent"
+            />
+          </div>
+        </div>
+
+        <label className="block text-[12px] text-zinc-500 mb-1">Theme JSON</label>
+        <textarea
+          value={json}
+          onChange={(e) => setJson(e.target.value)}
+          spellCheck={false}
+          className="flex-1 min-h-[260px] w-full rounded-lg border border-zinc-200 px-3 py-2 font-mono text-[12px] outline-none focus:border-accent resize-y"
+        />
+        {jsonError && <div className="mt-2 text-[12.5px] text-red-600">{jsonError}</div>}
+
+        <label className="flex items-center gap-2 mt-3 mb-5 cursor-pointer">
+          <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} className="w-4 h-4 accent-[#6d5efc]" />
+          <span className="text-[13px]">Available in the editor</span>
+        </label>
+
+        <div className="flex gap-2">
+          <button type="button" onClick={onClose} className="flex-1 h-10 rounded-lg border border-zinc-200 text-[13px] font-semibold">
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className="flex-1 h-10 rounded-lg bg-zinc-900 text-white text-[13px] font-semibold flex items-center justify-center gap-2 disabled:opacity-60"
+          >
+            {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Save
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function prettyJson(s: string): string {
+  try {
+    return JSON.stringify(JSON.parse(s), null, 2);
+  } catch {
+    return s;
+  }
 }
 
 /* ====================================================================== */

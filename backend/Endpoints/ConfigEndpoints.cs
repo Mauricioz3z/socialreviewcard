@@ -47,6 +47,19 @@ public static class ConfigEndpoints
         .AllowAnonymous()
         .WithTags("Config");
 
+        // GET /api/reel-themes -> enabled animation themes for the video studio.
+        routes.MapGet("/api/reel-themes", async (ApplicationDbContext db, CancellationToken ct) =>
+        {
+            var themes = await db.ReelThemes.AsNoTracking()
+                .Where(t => t.Enabled)
+                .OrderBy(t => t.SortOrder)
+                .Select(t => new PublicReelThemeDto { Id = t.Id, Name = t.Name, Json = t.Json })
+                .ToListAsync(ct);
+            return Results.Ok(themes);
+        })
+        .AllowAnonymous()
+        .WithTags("Config");
+
         return routes;
     }
 

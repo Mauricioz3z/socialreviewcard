@@ -20,6 +20,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<Feedback> Feedback => Set<Feedback>();
     public DbSet<Platform> Platforms => Set<Platform>();
+    public DbSet<ReelTheme> ReelThemes => Set<ReelTheme>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -112,6 +113,25 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
                 new Platform { Id = 3, Label = "Amazon", Color = "#E88A1A", Icon = "fab:amazon", SortOrder = 3, Enabled = true },
                 new Platform { Id = 4, Label = "Instagram", Color = "#E1306C", Icon = "fab:instagram", SortOrder = 4, Enabled = true },
                 new Platform { Id = 5, Label = "Google", Color = "#4285F4", Icon = "fab:google", SortOrder = 5, Enabled = true });
+        });
+
+        builder.Entity<ReelTheme>(entity =>
+        {
+            entity.HasKey(t => t.Id);
+            entity.Property(t => t.Name).IsRequired().HasMaxLength(80);
+            entity.Property(t => t.Json).IsRequired().HasColumnType("jsonb");
+
+            entity.HasData(new ReelTheme
+            {
+                Id = 1,
+                Name = "Boho Botanical",
+                Enabled = true,
+                SortOrder = 1,
+                UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                Json = """
+                {"themeId":"boho-botanical-v1","name":"Boho Botanical","totalDurationMs":8000,"fps":30,"dimensions":{"width":1080,"height":1920},"background":{"type":"ambient-gradient","colors":["#f4ebe1","#e4d4c8","#dfcdbe"],"shiftSpeedMs":15000,"angleDeg":135,"vignette":0.16},"foregroundAssets":[{"id":"left-eucalyptus","type":"svg","url":"/assets/botanical/branch_left.svg","position":{"bottom":-30,"left":-40},"size":{"width":520},"transformOrigin":"bottom-left","opacity":0.95,"animation":{"type":"sway","maxRotationDeg":2.2,"frequencyHz":0.22},"layer":"front-card"},{"id":"right-eucalyptus","type":"svg","url":"/assets/botanical/branch_left.svg","position":{"top":-40,"right":-60},"size":{"width":440},"transformOrigin":"top-right","opacity":0.9,"animation":{"type":"sway","maxRotationDeg":2,"frequencyHz":0.18,"phase":1.4},"layer":"front-card"},{"id":"top-cloud","type":"svg","url":"/assets/botanical/cloud_doodle.svg","position":{"top":150,"left":90},"size":{"width":260},"transformOrigin":"center","opacity":0.5,"animation":{"type":"float","amplitudePx":12,"frequencyHz":0.2},"layer":"behind-card"}],"cardContainer":{"entranceDelayMs":500,"entranceDurationMs":750,"entranceAnimation":"scale-up-bounce","fitScale":0.78,"shadow":true,"continuousAnimation":{"type":"slow-parallax-zoom","maxScale":1.05}},"contentTimeline":{"starsReveal":{"delayMs":1200,"staggerMs":150},"textReveal":{"delayMs":2000,"type":"fade-up-word","staggerMs":100}}}
+                """,
+            });
         });
     }
 }
