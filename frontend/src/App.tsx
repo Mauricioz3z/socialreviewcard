@@ -933,22 +933,19 @@ export default function App() {
             )}
           </button>
 
-          {/* mobile — compact secondary actions in a single row */}
-          <div className="lg:hidden grid grid-cols-5 gap-1.5">
+          {/* mobile — compact secondary actions in a single row. Scene editing
+              lives inside the Video studio now (single entry point). */}
+          <div className="lg:hidden grid grid-cols-4 gap-1.5">
             {[
               { Icon: Eye, label: 'Preview', onClick: () => setShowMobilePreview(true) },
               { Icon: Share2, label: 'Share', onClick: doShare, busy: sharing },
               { Icon: Clapperboard, label: 'Video', onClick: openReel },
-              { Icon: Sparkle, label: 'Scene', onClick: openCompose, active: !!scene },
               { Icon: Save, label: 'Save', onClick: onSave, busy: saving },
             ].map((a) => (
               <button
                 key={a.label}
                 onClick={a.onClick}
-                className={
-                  'flex flex-col items-center gap-1 py-2 rounded-xl border text-[10px] font-semibold transition active:scale-95 ' +
-                  (a.active ? 'border-accent bg-accent-soft text-accent' : 'border-zinc-200 text-zinc-600')
-                }
+                className="flex flex-col items-center gap-1 py-2 rounded-xl border border-zinc-200 text-zinc-600 text-[10px] font-semibold transition active:scale-95"
               >
                 {a.busy ? <Loader2 size={17} className="animate-spin" /> : <a.Icon size={17} strokeWidth={2.1} />}
                 {a.label}
@@ -984,12 +981,6 @@ export default function App() {
             >
               <Clapperboard size={16} strokeWidth={2.2} /> Animate to video
               <span className="text-[10px] font-bold uppercase tracking-wide bg-accent text-white px-1.5 py-0.5 rounded">Beta</span>
-            </button>
-            <button
-              onClick={openCompose}
-              className="w-full flex items-center justify-center gap-2 h-10 rounded-xl text-accent text-[12.5px] font-semibold transition-all hover:bg-accent-soft active:scale-[0.99]"
-            >
-              <Sparkle size={15} strokeWidth={2.2} /> Customize animation{scene ? ' · edited' : ''}
             </button>
             <button
               onClick={onSave}
@@ -1157,7 +1148,9 @@ export default function App() {
       )}
 
       {/* ============ REEL (animated video) ============ */}
-      {reelLayers && (
+      {/* Hidden (not unmounted) while the scene composer is open on top — it
+          comes back with the updated scene as soon as the composer closes. */}
+      {reelLayers && !composeUrl && (
         <ReelModal
           layers={reelLayers}
           scene={scene}
@@ -1166,6 +1159,7 @@ export default function App() {
             setReelLayers(null);
             setShowUpgrade(true);
           }}
+          onCustomize={openCompose}
           onClose={() => setReelLayers(null)}
         />
       )}

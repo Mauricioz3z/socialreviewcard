@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Clapperboard, Download, Loader2, X } from 'lucide-react';
+import { Clapperboard, Download, Loader2, Sparkle, X } from 'lucide-react';
 import { exportReel } from './export/exportReel';
 import { bohoBotanicalV1 } from './theme/presets';
 import { createThemeScene, loadThemeAssets, type CardLayers } from './theme/themeScene';
@@ -106,12 +106,15 @@ export function ReelModal({
   scene = null,
   canExport = true,
   onUpgrade,
+  onCustomize,
   onClose,
 }: {
   layers: { base: string; stars: string; text: string; wordRects: { x: number; y: number; w: number; h: number }[] };
   scene?: UserScene | null;
   canExport?: boolean;
   onUpgrade?: () => void;
+  /** Opens the scene composer on top; the modal reopens when it closes. */
+  onCustomize?: () => void;
   onClose: () => void;
 }) {
   const [themes, setThemes] = useState<ReelTheme[]>(scene ? [userSceneToTheme(scene)] : [bohoBotanicalV1]);
@@ -281,7 +284,7 @@ export function ReelModal({
           </p>
 
           {themes.length > 1 && !result && (
-            <div className="flex flex-wrap gap-1.5 mb-5">
+            <div className="flex flex-wrap gap-1.5 mb-3">
               {themes.map((t, i) => (
                 <button
                   key={i}
@@ -298,6 +301,17 @@ export function ReelModal({
                 </button>
               ))}
             </div>
+          )}
+
+          {/* edit-your-scene entry — the composer opens on top and this modal
+              comes back (with the updated scene first) when it closes */}
+          {onCustomize && !result && !busy && (
+            <button
+              onClick={onCustomize}
+              className="mb-5 w-full inline-flex items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/60 h-10 text-[12.5px] font-semibold text-zinc-600 transition hover:border-accent hover:text-accent hover:bg-accent-soft"
+            >
+              <Sparkle size={14} strokeWidth={2.2} /> {scene ? 'Edit your scene' : 'Customize scene'} — decorations, colors & timing
+            </button>
           )}
 
           {status === 'loading' && (
