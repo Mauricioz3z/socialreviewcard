@@ -605,6 +605,7 @@ export default function App() {
                 upgrading={upgrading}
                 onSignOut={signOut}
                 onMyCards={() => setShowCards(true)}
+                priceLabel={config?.proPriceLabel || '$1.99/mo'}
                 dark={false}
               />
             ) : (
@@ -972,6 +973,7 @@ export default function App() {
                 upgrading={upgrading}
                 onSignOut={signOut}
                 onMyCards={() => setShowCards(true)}
+                priceLabel={config?.proPriceLabel || '$1.99/mo'}
                 dark
               />
             ) : (
@@ -1236,6 +1238,7 @@ function AccountMenu({
   upgrading,
   onSignOut,
   onMyCards,
+  priceLabel,
   dark = false,
 }: {
   email: string;
@@ -1244,6 +1247,7 @@ function AccountMenu({
   upgrading: boolean;
   onSignOut: () => void;
   onMyCards: () => void;
+  priceLabel: string;
   dark?: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -1308,7 +1312,7 @@ function AccountMenu({
                   disabled={upgrading}
                   className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-semibold text-accent hover:bg-accent-soft transition text-left disabled:opacity-60"
                 >
-                  {upgrading ? <Loader2 size={15} className="animate-spin" /> : <Crown size={15} />} Upgrade to Pro · $1.99/mo
+                  {upgrading ? <Loader2 size={15} className="animate-spin" /> : <Crown size={15} />} Upgrade to Pro · {priceLabel}
                 </button>
               )}
               <button
