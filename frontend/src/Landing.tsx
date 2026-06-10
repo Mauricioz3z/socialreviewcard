@@ -3,11 +3,11 @@ import {
   ArrowRight,
   BadgeCheck,
   Check,
-  ClipboardPaste,
   Download,
   Images,
   Palette,
   Quote,
+  ScanText,
   Smartphone,
   Star,
   Type,
@@ -175,7 +175,7 @@ export default function Landing() {
                 </em> art.
               </h1>
               <p className="mt-7 text-[18px] leading-relaxed text-ink-soft max-w-[460px]">
-                Paste a customer review, pick a style, and export a gorgeous card for Instagram Stories or Posts — in seconds. No design skills required.
+                Paste a <strong className="font-semibold text-ink">screenshot</strong> of any customer review — we read the text, name and stars for you — pick a style, and export a gorgeous card for Stories or Posts. No design skills, no retyping.
               </p>
               <div className="mt-9 flex flex-wrap items-center gap-3">
                 <a href={CTA} className="group inline-flex items-center gap-2 rounded-full bg-ink text-cream px-7 h-[54px] text-[16px] font-semibold transition-all hover:gap-3 active:scale-[.98] shadow-[0_14px_34px_-12px_rgba(26,22,19,0.7)]">
@@ -223,7 +223,7 @@ export default function Landing() {
           </div>
           <div className="mt-14 grid md:grid-cols-3 gap-6">
             {[
-              { n: '01', Icon: ClipboardPaste, title: 'Paste any review', body: 'Drop in the text, the customer’s name, the platform and a star rating. That’s the whole setup.' },
+              { n: '01', Icon: ScanText, title: 'Drop in a screenshot', body: 'Snap or paste a screenshot of any review — AI fills in the text, name, stars and platform for you. Typing it in works too.' },
               { n: '02', Icon: Wand2, title: 'Style it your way', body: 'Pick a card design, a background, serif or sans — watch it update live as you go.' },
               { n: '03', Icon: Download, title: 'Export & share', body: 'Download a crisp PNG sized for Stories (9:16) or Posts (1:1) and post it everywhere.' },
             ].map((s, i) => (
@@ -272,6 +272,21 @@ export default function Landing() {
               <p className="mt-5 text-[16.5px] leading-relaxed text-ink-soft max-w-md">Every control is tuned so even a quick card looks like a brand designed it. No templates that scream “made in five minutes.”</p>
             </div>
             <div className="grid sm:grid-cols-2 gap-5">
+              {/* hero feature — the screenshot import gets top billing */}
+              <div className="reveal sm:col-span-2 rounded-3xl bg-ink text-cream p-7 lg:p-8 flex flex-col sm:flex-row sm:items-center gap-5">
+                <span className="grid place-items-center w-12 h-12 rounded-xl shrink-0" style={{ background: 'linear-gradient(120deg,#ffdca8,#ff9aa2,#c8a2e0)', color: '#1a1613' }}>
+                  <ScanText size={22} strokeWidth={2.2} />
+                </span>
+                <div>
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <h3 className="font-bold text-[18px] tracking-tight">Import from a screenshot</h3>
+                    <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider" style={{ background: 'linear-gradient(120deg,#ffdca8,#ff9aa2,#c8a2e0)', color: '#1a1613' }}>New</span>
+                  </div>
+                  <p className="mt-1.5 text-[14.5px] leading-relaxed text-cream/70">
+                    Screenshot a review from Google, Etsy, Amazon, WhatsApp — anywhere — and AI extracts the text, customer name, star rating and platform. Your card is ready before you could have typed the first sentence.
+                  </p>
+                </div>
+              </div>
               {[
                 { Icon: Smartphone, title: 'Stories & Posts', body: 'Toggle between 9:16 and 1:1 instantly — your card recomposes to fit each format perfectly.' },
                 { Icon: Palette, title: 'Trendy backgrounds', body: 'Pastel Sunset, Aurora, Deep Oceanic gradients plus clean solids — with optional film grain.' },
@@ -298,8 +313,8 @@ export default function Landing() {
           </div>
           <div className="grid md:grid-cols-3 gap-6">
             {[
-              { t: 'The old way', body: 'Open Canva → hunt for a template → paste the review → fix the font → align the stars → resize for Stories → export.', em: '~15 minutes per post.' },
-              { t: 'With SocialReviewCard', body: 'Paste the review, pick a style, export.', em: 'Under 30 seconds — and it looks like a brand designed it.' },
+              { t: 'The old way', body: 'Open Canva → hunt for a template → retype the review → fix the font → align the stars → resize for Stories → export.', em: '~15 minutes per post.' },
+              { t: 'With SocialReviewCard', body: 'Drop in a screenshot — AI fills everything — pick a style, export.', em: 'Under 30 seconds — and it looks like a brand designed it.' },
               { t: 'What that buys you', body: 'A week of reviews becomes a month of Stories in one sitting.', em: 'More social proof posted = more trust = more sales.' },
             ].map((c, i) => (
               <div key={c.t} className="reveal rounded-3xl bg-white border border-line p-8 flex flex-col" style={{ transitionDelay: i * 70 + 'ms' }}>
