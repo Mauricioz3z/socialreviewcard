@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ClipboardPaste, ImageUp, Loader2, ScanText, X } from 'lucide-react';
+import { Camera, ClipboardPaste, ImageUp, Loader2, ScanText, X } from 'lucide-react';
 import { ApiError, type ScanReviewResult } from '../lib/api';
 
 /** Longest edge sent to the vision API — its optimal max; keeps uploads small. */
@@ -40,6 +40,7 @@ export function ImportScreenshotModal({
   onApply: (result: ScanReviewResult) => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [image, setImage] = useState<Blob | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -148,6 +149,7 @@ export function ImportScreenshotModal({
               </div>
             )}
           </div>
+          {/* Gallery / file picker (no `capture`, so the OS opens the photo picker). */}
           <input
             ref={fileRef}
             type="file"
@@ -158,6 +160,34 @@ export function ImportScreenshotModal({
               e.target.value = '';
             }}
           />
+          {/* Camera capture — `capture` makes Android/iOS open the camera directly
+              (the modern Android photo picker otherwise offers gallery only). */}
+          <input
+            ref={cameraRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={(e) => {
+              void acceptFile(e.target.files?.[0]);
+              e.target.value = '';
+            }}
+          />
+
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button
+              onClick={() => cameraRef.current?.click()}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white h-[42px] text-[13px] font-semibold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50"
+            >
+              <Camera size={15} strokeWidth={2.2} /> Take a photo
+            </button>
+            <button
+              onClick={() => fileRef.current?.click()}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white h-[42px] text-[13px] font-semibold text-zinc-700 transition hover:border-zinc-300 hover:bg-zinc-50"
+            >
+              <ImageUp size={15} strokeWidth={2.2} /> From gallery
+            </button>
+          </div>
 
           {error && (
             <div className="mt-3 text-[12.5px] text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
