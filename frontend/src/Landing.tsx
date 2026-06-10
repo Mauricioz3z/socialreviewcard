@@ -333,19 +333,21 @@ export default function Landing() {
 
           {/* monthly / yearly toggle */}
           {annual && (
-            <div className="reveal flex items-center justify-center gap-2 mb-10">
-              <div className="inline-flex items-center rounded-full border border-line bg-white p-1">
+            <div className="reveal flex flex-wrap items-center justify-center gap-3 mb-12">
+              <div className="inline-flex items-center rounded-full border border-line bg-white p-1 shadow-[0_10px_28px_-14px_rgba(26,22,19,0.35)]">
                 {([['Monthly', false], ['Yearly', true]] as [string, boolean][]).map(([l, v]) => (
                   <button
                     key={l}
                     onClick={() => setYearly(v)}
-                    className={'px-4 h-9 rounded-full text-[13.5px] font-semibold transition ' + (yearly === v ? 'bg-ink text-cream' : 'text-ink-soft hover:text-ink')}
+                    className={'px-6 h-11 rounded-full text-[14.5px] font-semibold transition ' + (yearly === v ? 'bg-ink text-cream shadow-sm' : 'text-ink-soft hover:text-ink')}
                   >
                     {l}
                   </button>
                 ))}
               </div>
-              {yearly && <span className="text-[12.5px] font-semibold text-emerald-600">2 months free</span>}
+              <span className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 px-3.5 py-1.5 text-[12.5px] font-bold ring-1 ring-emerald-200">
+                Save 2 months
+              </span>
             </div>
           )}
 
