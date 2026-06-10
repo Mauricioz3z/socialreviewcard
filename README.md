@@ -67,6 +67,9 @@ dotnet run        # http://localhost:5080
 | `Stripe:WebhookSecret` | Webhook signing secret (`whsec_...`) |
 | `Stripe:PriceId` | Recurring price id for the $1.99/mo plan |
 | `Stripe:SuccessUrl` / `CancelUrl` | Post-checkout redirect URLs |
+| `Anthropic:ApiKey` | Anthropic API key (`sk-ant-...`) for screenshot import; empty disables the feature |
+| `Anthropic:Model` | Vision model for review extraction (default `claude-haiku-4-5-20251001`) |
+| `Anthropic:FreeDailyScanLimit` / `ProDailyScanLimit` | Per-user daily screenshot scans (default 5 / 50) |
 
 Use user-secrets or environment variables for real keys; never commit them.
 
@@ -80,6 +83,7 @@ Use user-secrets or environment variables for real keys; never commit them.
 | GET | `/api/cards` | ✅ | List the caller's cards |
 | POST | `/api/cards` | ✅ | Create / update a card config |
 | DELETE | `/api/cards/{id}` | ✅ | Delete an owned card |
+| POST | `/api/scan/review` | ✅ | Extract review fields from a screenshot (vision LLM, daily-capped) |
 | POST | `/api/billing/checkout` | ✅ | Start Stripe Checkout → `{ url }` |
 | POST | `/api/billing/webhook` | — | Stripe webhook (signature verified) |
 | GET | `/health` | — | Liveness probe |

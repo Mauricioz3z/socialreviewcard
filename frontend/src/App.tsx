@@ -18,6 +18,7 @@ import {
   Palette,
   Quote,
   Save,
+  ScanText,
   Share2,
   Smartphone,
   Sparkle,
@@ -31,6 +32,7 @@ import {
 import { Preview, CardCanvas } from './components/Preview';
 import { Field, Section, Segmented, StyleSwatch, Toggle } from './components/ui';
 import { AuthModal } from './components/AuthModal';
+import { ImportScreenshotModal } from './components/ImportScreenshotModal';
 import { ReelModal } from './feature/reel/ReelModal';
 import { SceneComposer } from './feature/reel/SceneComposer';
 import type { UserScene } from './feature/reel/userScene';
@@ -48,9 +50,11 @@ import {
   refresh,
   saveCard,
   saveSession,
+  scanReviewScreenshot,
   startCheckout,
   submitFeedback,
   type FeedbackType,
+  type ScanReviewResult,
   type PublicBillingPlan,
   type PublicConfig,
   type UsageInfo,
@@ -139,6 +143,7 @@ export default function App() {
   const [plans, setPlans] = useState<PublicBillingPlan[]>([]);
   const [showMobilePreview, setShowMobilePreview] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [reelLayers, setReelLayers] = useState<{
     base: string;
     stars: string;
@@ -456,6 +461,33 @@ export default function App() {
   const outOfQuota = () =>
     !!usage && !usage.isPro && usage.remaining !== null && usage.remaining <= 0;
 
+  /* ----------------------------- screenshot import ----------------------------- */
+  const openImport = () => {
+    if (!session) {
+      setShowAuth(true);
+      showToast('Sign in to import', 'Sign in with Google and we read the screenshot for you.', 'error');
+      return;
+    }
+    setShowImport(true);
+  };
+
+  // Fills the editor from the extracted fields, enforcing the same length caps
+  // as manual input (the model usually respects the schema, but extracted text
+  // is still untrusted). Review text is trimmed verbatim, never paraphrased.
+  const REVIEW_MAX = 260;
+  const applyScan = (r: ScanReviewResult) => {
+    const trimmed = r.review.length > REVIEW_MAX;
+    setReview(r.review.slice(0, REVIEW_MAX));
+    if (r.reviewerName) setName(r.reviewerName.slice(0, 80));
+    if (r.rating >= 1 && r.rating <= 5) setRating(r.rating);
+    if (r.platform) setPlatform(r.platform.slice(0, 40));
+    setShowImport(false);
+    showToast(
+      'Review imported',
+      trimmed ? `Text trimmed to ${REVIEW_MAX} characters to fit the card.` : 'Fields filled from your screenshot.',
+    );
+  };
+
   const doExport = async () => {
     if (exporting) return;
     if (!session) {
@@ -638,6 +670,13 @@ export default function App() {
         <div className="flex-1 overflow-y-auto sidebar-scroll">
           {/* ---- Review data ---- */}
           <Section Icon={MessageSquareQuote} title="Review">
+            <button
+              onClick={openImport}
+              className="w-full mb-4 inline-flex items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/60 px-3.5 py-2.5 text-[13px] font-semibold text-zinc-600 transition hover:border-accent hover:text-accent hover:bg-accent-soft"
+            >
+              <ScanText size={15} strokeWidth={2.2} /> Import from screenshot
+            </button>
+
             <Field label="Review text">
               <textarea
                 value={review}
@@ -1074,6 +1113,13 @@ export default function App() {
 
       {/* ============ AUTH MODAL ============ */}
       {showAuth && <AuthModal freeLimit={freeLimit} onClose={() => setShowAuth(false)} onAuthed={onAuthed} />}
+      {showImport && session && (
+        <ImportScreenshotModal
+          onClose={() => setShowImport(false)}
+          onScan={(image) => withAuth((t) => scanReviewScreenshot(t, image))}
+          onApply={applyScan}
+        />
+      )}
 
       {/* ============ MOBILE PREVIEW MODAL ============ */}
       {showMobilePreview && (

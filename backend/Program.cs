@@ -61,6 +61,14 @@ builder.Services.AddScoped<IStripeService, StripeService>();
 // Audit logging for backoffice actions.
 builder.Services.AddScoped<IAuditLogger, AuditLogger>();
 
+// Screenshot import: vision LLM extraction + per-user daily rate limiting.
+builder.Services.Configure<AnthropicOptions>(builder.Configuration.GetSection(AnthropicOptions.SectionName));
+// 30s is ample for a single vision extraction; keeps slow scans from
+// pinning connections for a full minute.
+builder.Services.AddHttpClient<IReviewScanner, AnthropicReviewScanner>(client =>
+    client.Timeout = TimeSpan.FromSeconds(30));
+builder.Services.AddSingleton<ScanQuotaTracker>();
+
 // Persistent store for admin-uploaded assets.
 builder.Services.AddSingleton<UploadStore>();
 
@@ -164,6 +172,7 @@ app.MapAuthEndpoints();
 app.MapCardEndpoints();
 app.MapBillingEndpoints();
 app.MapUsageEndpoints();
+app.MapScanEndpoints();
 
 // Public runtime config + feedback + admin backoffice.
 app.MapConfigEndpoints();

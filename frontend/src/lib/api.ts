@@ -253,6 +253,33 @@ export function getUsage(token: string): Promise<UsageInfo> {
   return request<UsageInfo>('/api/usage', { method: 'GET', token });
 }
 
+/* ----------------------------- Screenshot import ----------------------------- */
+
+export interface ScanReviewResult {
+  found: boolean;
+  review: string;
+  reviewerName: string;
+  rating: number;
+  platform: string;
+}
+
+/**
+ * Uploads a review screenshot and gets the extracted fields back. Multipart
+ * upload, so it bypasses the JSON `request` helper; throws ApiError(401) so
+ * `withAuth` can transparently refresh, 429 when the daily scan cap is hit.
+ */
+export async function scanReviewScreenshot(token: string, image: Blob): Promise<ScanReviewResult> {
+  const form = new FormData();
+  form.append('image', image, 'screenshot.jpg');
+  const res = await fetch(`${API_BASE}/api/scan/review`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  if (!res.ok) throw new ApiError(await parseError(res), res.status);
+  return (await res.json()) as ScanReviewResult;
+}
+
 /**
  * Claims one export slot. Resolves with ok=false (HTTP 402) when the free quota
  * is exhausted; throws ApiError(401) so callers can transparently refresh.
