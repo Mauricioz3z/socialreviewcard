@@ -125,8 +125,8 @@ export function SceneComposer({
         {selected === idx && (
           <div
             onPointerDown={(e) => startDrag(e, idx, 'resize')}
-            className="absolute -right-1.5 -bottom-1.5 w-3.5 h-3.5 rounded-sm bg-accent"
-            style={{ cursor: 'nwse-resize' }}
+            className="absolute -right-2.5 -bottom-2.5 w-6 h-6 rounded-full bg-accent ring-2 ring-white shadow"
+            style={{ cursor: 'nwse-resize', touchAction: 'none' }}
           />
         )}
       </div>
@@ -187,7 +187,7 @@ export function SceneComposer({
       </div>
 
       {/* panel */}
-      <aside className="w-full lg:w-[340px] shrink-0 lg:h-full bg-white flex flex-col max-h-[55vh] lg:max-h-none">
+      <aside className="w-full lg:w-[340px] shrink-0 lg:h-full bg-white flex flex-col max-h-[46vh] lg:max-h-none">
         <div className="h-14 shrink-0 flex items-center justify-between px-5 border-b border-zinc-100">
           <span className="font-bold text-[15px] text-zinc-900">Compose scene</span>
           <button onClick={onClose} className="text-zinc-300 hover:text-zinc-500 transition">

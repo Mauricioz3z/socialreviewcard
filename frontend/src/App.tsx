@@ -872,13 +872,7 @@ export default function App() {
 
         {/* sticky export */}
         <div className="shrink-0 p-4 border-t border-zinc-100 bg-white space-y-2">
-          {/* mobile-only: open the preview (no room for a side-by-side pane) */}
-          <button
-            onClick={() => setShowMobilePreview(true)}
-            className="lg:hidden w-full flex items-center justify-center gap-2 h-11 rounded-xl border border-zinc-200 bg-zinc-50 text-zinc-800 text-[13.5px] font-semibold transition-all hover:border-zinc-300 active:scale-[0.99]"
-          >
-            <Eye size={16} strokeWidth={2.2} /> Preview card
-          </button>
+          {/* primary action — export image */}
           <button
             onClick={doExport}
             disabled={exporting}
@@ -894,54 +888,81 @@ export default function App() {
               </>
             )}
           </button>
-          <button
-            onClick={doShare}
-            disabled={sharing}
-            className="w-full flex items-center justify-center gap-2 h-11 rounded-xl bg-accent text-white text-[13.5px] font-semibold transition-all hover:bg-accent-hover active:scale-[0.99] disabled:opacity-80"
-          >
-            {sharing ? (
-              <>
-                <Loader2 size={16} className="animate-spin" /> Preparing…
-              </>
-            ) : (
-              <>
-                <Share2 size={16} strokeWidth={2.2} /> Share to social
-              </>
+
+          {/* mobile — compact secondary actions in a single row */}
+          <div className="lg:hidden grid grid-cols-5 gap-1.5">
+            {[
+              { Icon: Eye, label: 'Preview', onClick: () => setShowMobilePreview(true) },
+              { Icon: Share2, label: 'Share', onClick: doShare, busy: sharing },
+              { Icon: Clapperboard, label: 'Video', onClick: openReel },
+              { Icon: Sparkle, label: 'Scene', onClick: openCompose, active: !!scene },
+              { Icon: Save, label: 'Save', onClick: onSave, busy: saving },
+            ].map((a) => (
+              <button
+                key={a.label}
+                onClick={a.onClick}
+                className={
+                  'flex flex-col items-center gap-1 py-2 rounded-xl border text-[10px] font-semibold transition active:scale-95 ' +
+                  (a.active ? 'border-accent bg-accent-soft text-accent' : 'border-zinc-200 text-zinc-600')
+                }
+              >
+                {a.busy ? <Loader2 size={17} className="animate-spin" /> : <a.Icon size={17} strokeWidth={2.1} />}
+                {a.label}
+              </button>
+            ))}
+          </div>
+
+          {/* desktop — full secondary actions */}
+          <div className="hidden lg:block space-y-2">
+            <button
+              onClick={doShare}
+              disabled={sharing}
+              className="w-full flex items-center justify-center gap-2 h-11 rounded-xl bg-accent text-white text-[13.5px] font-semibold transition-all hover:bg-accent-hover active:scale-[0.99] disabled:opacity-80"
+            >
+              {sharing ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" /> Preparing…
+                </>
+              ) : (
+                <>
+                  <Share2 size={16} strokeWidth={2.2} /> Share to social
+                </>
+              )}
+            </button>
+            {!canShareFiles && (
+              <p className="text-center text-[11px] text-zinc-400 leading-snug">
+                Direct sharing is mobile-only — on desktop the image downloads so you can upload it.
+              </p>
             )}
-          </button>
-          {!canShareFiles && (
-            <p className="text-center text-[11px] text-zinc-400 -mt-0.5 leading-snug">
-              Direct sharing is mobile-only — on desktop the image downloads so you can upload it.
-            </p>
-          )}
-          <button
-            onClick={openReel}
-            className="w-full flex items-center justify-center gap-2 h-11 rounded-xl border border-accent/40 bg-accent-soft text-accent text-[13.5px] font-semibold transition-all hover:border-accent active:scale-[0.99]"
-          >
-            <Clapperboard size={16} strokeWidth={2.2} /> Animate to video
-            <span className="text-[10px] font-bold uppercase tracking-wide bg-accent text-white px-1.5 py-0.5 rounded">Beta</span>
-          </button>
-          <button
-            onClick={openCompose}
-            className="w-full flex items-center justify-center gap-2 h-10 rounded-xl text-accent text-[12.5px] font-semibold transition-all hover:bg-accent-soft active:scale-[0.99]"
-          >
-            <Sparkle size={15} strokeWidth={2.2} /> Customize animation{scene ? ' · edited' : ''}
-          </button>
-          <button
-            onClick={onSave}
-            disabled={saving}
-            className="w-full flex items-center justify-center gap-2 h-11 rounded-xl border border-zinc-200 bg-white text-zinc-800 text-[13.5px] font-semibold transition-all hover:border-zinc-300 active:scale-[0.99] disabled:opacity-70"
-          >
-            {saving ? (
-              <>
-                <Loader2 size={16} className="animate-spin" /> Saving…
-              </>
-            ) : (
-              <>
-                <Save size={16} strokeWidth={2.2} /> {editingId ? 'Update saved card' : 'Save to cloud'}
-              </>
-            )}
-          </button>
+            <button
+              onClick={openReel}
+              className="w-full flex items-center justify-center gap-2 h-11 rounded-xl border border-accent/40 bg-accent-soft text-accent text-[13.5px] font-semibold transition-all hover:border-accent active:scale-[0.99]"
+            >
+              <Clapperboard size={16} strokeWidth={2.2} /> Animate to video
+              <span className="text-[10px] font-bold uppercase tracking-wide bg-accent text-white px-1.5 py-0.5 rounded">Beta</span>
+            </button>
+            <button
+              onClick={openCompose}
+              className="w-full flex items-center justify-center gap-2 h-10 rounded-xl text-accent text-[12.5px] font-semibold transition-all hover:bg-accent-soft active:scale-[0.99]"
+            >
+              <Sparkle size={15} strokeWidth={2.2} /> Customize animation{scene ? ' · edited' : ''}
+            </button>
+            <button
+              onClick={onSave}
+              disabled={saving}
+              className="w-full flex items-center justify-center gap-2 h-11 rounded-xl border border-zinc-200 bg-white text-zinc-800 text-[13.5px] font-semibold transition-all hover:border-zinc-300 active:scale-[0.99] disabled:opacity-70"
+            >
+              {saving ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" /> Saving…
+                </>
+              ) : (
+                <>
+                  <Save size={16} strokeWidth={2.2} /> {editingId ? 'Update saved card' : 'Save to cloud'}
+                </>
+              )}
+            </button>
+          </div>
           <div className="text-center text-[11px] text-zinc-400">
             {!session ? (
               <>Sign in with Google to export · {RATIOS[ratio].w}×{RATIOS[ratio].h}</>
