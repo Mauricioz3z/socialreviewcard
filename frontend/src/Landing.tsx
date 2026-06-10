@@ -30,6 +30,7 @@ import {
   type PublicBillingPlan,
   type PublicConfig,
 } from './lib/api';
+import { USE_CASES } from './seo/useCases';
 import type { CardData } from './types';
 
 /* ----------------------------- demo cards ----------------------------- */
@@ -462,7 +463,7 @@ export default function Landing() {
 
       {/* ---- Footer ---- */}
       <footer className="border-t border-line bg-white/40">
-        <div className="mx-auto max-w-[1200px] px-6 py-16 grid md:grid-cols-[1.6fr_1fr_1fr] gap-10">
+        <div className="mx-auto max-w-[1200px] px-6 py-16 grid sm:grid-cols-2 md:grid-cols-[1.5fr_1fr_1.3fr_0.8fr] gap-10">
           <div>
             <div className="flex items-center gap-2.5">
               <span className="grid place-items-center w-9 h-9 rounded-[11px] bg-ink text-cream"><Quote size={18} strokeWidth={2.2} /></span>
@@ -473,6 +474,8 @@ export default function Landing() {
           {(
             [
               ['Product', [['How it works', '#how'], ['Styles', '#styles'], ['Features', '#features'], ['Pricing', '#pricing']]],
+              // Story variants only — each use-case page cross-links the rest.
+              ['Use cases', USE_CASES.filter((u) => u.demo.ratio === 'story').map((u) => [`${u.platformName} → Instagram`, `/${u.slug}`] as [string, string])],
               ['Legal', [['Privacy', '/privacy'], ['Terms', '/terms']]],
             ] as [string, [string, string][]][]
           ).map(([h, links]) => (
