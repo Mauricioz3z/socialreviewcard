@@ -239,8 +239,9 @@ export function ReelModal({
   return (
     <div className="fixed inset-0 z-[70] grid place-items-center bg-black/60 backdrop-blur-sm p-4 font-ui">
       <div className="w-full max-w-[920px] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row max-h-[92vh]">
-        {/* preview / result */}
-        <div className="bg-zinc-950 grid place-items-center p-5 md:w-[58%]">
+        {/* preview / result — smaller on phones so the controls (and the
+            Export button) always fit below it. */}
+        <div className="bg-zinc-950 grid place-items-center p-3 md:p-5 md:w-[58%] shrink-0 md:shrink">
           {result ? (
             <video
               src={result.url}
@@ -248,7 +249,7 @@ export function ReelModal({
               autoPlay
               loop
               playsInline
-              className="max-h-[70vh] rounded-xl"
+              className="max-h-[36vh] md:max-h-[70vh] rounded-xl"
               style={{ aspectRatio: '9 / 16' }}
             />
           ) : (
@@ -256,14 +257,14 @@ export function ReelModal({
               ref={canvasRef}
               width={W}
               height={H}
-              className="max-h-[70vh] rounded-xl"
+              className="max-h-[36vh] md:max-h-[70vh] rounded-xl"
               style={{ width: 'auto', aspectRatio: '9 / 16' }}
             />
           )}
         </div>
 
-        {/* controls */}
-        <div className="p-6 md:w-[42%] flex flex-col">
+        {/* controls — scrollable on phones so nothing gets cut off */}
+        <div className="p-5 md:p-6 md:w-[42%] flex flex-col flex-1 min-h-0 overflow-y-auto">
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
               <span className="grid place-items-center w-8 h-8 rounded-lg bg-accent text-white">

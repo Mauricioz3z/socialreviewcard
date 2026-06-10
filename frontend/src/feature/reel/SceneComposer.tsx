@@ -23,10 +23,32 @@ export function SceneComposer({
   const [selected, setSelected] = useState<number | null>(null);
   const [gallery, setGallery] = useState<{ name: string; url: string }[] | null>(null);
   const [playing, setPlaying] = useState(false);
+  const [confirmExit, setConfirmExit] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
   const playCanvasRef = useRef<HTMLCanvasElement>(null);
   const sceneRef = useRef(scene);
   sceneRef.current = scene;
+
+  // Snapshot of the scene as opened — the dirty check compares against this.
+  const baselineRef = useRef(JSON.stringify(initial ?? defaultScene()));
+  const dirty = JSON.stringify(scene) !== baselineRef.current;
+
+  // X / Cancel: ask before throwing away unsaved edits.
+  const requestClose = () => {
+    if (dirty) setConfirmExit(true);
+    else onClose();
+  };
+
+  // Page reload / tab close with unsaved edits → native browser confirmation.
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
 
   useEffect(() => {
     getAssets().then(setGallery).catch(() => setGallery([]));
@@ -186,11 +208,17 @@ export function SceneComposer({
         )}
       </div>
 
-      {/* panel */}
-      <aside className="w-full lg:w-[340px] shrink-0 lg:h-full bg-white flex flex-col max-h-[46vh] lg:max-h-none">
+      {/* panel — hidden while the preview plays so the animation gets the full
+          screen; it comes back on Stop. */}
+      <aside
+        className={
+          (playing ? 'hidden ' : '') +
+          'w-full lg:w-[340px] shrink-0 lg:h-full bg-white flex flex-col max-h-[46vh] lg:max-h-none'
+        }
+      >
         <div className="h-14 shrink-0 flex items-center justify-between px-5 border-b border-zinc-100">
           <span className="font-bold text-[15px] text-zinc-900">Compose scene</span>
-          <button onClick={onClose} className="text-zinc-300 hover:text-zinc-500 transition">
+          <button onClick={requestClose} className="text-zinc-300 hover:text-zinc-500 transition">
             <X size={18} />
           </button>
         </div>
@@ -324,7 +352,7 @@ export function SceneComposer({
         </div>
 
         <div className="shrink-0 p-4 border-t border-zinc-100 flex gap-2">
-          <button onClick={onClose} className="flex-1 h-11 rounded-xl border border-zinc-200 text-[13.5px] font-semibold">
+          <button onClick={requestClose} className="flex-1 h-11 rounded-xl border border-zinc-200 text-[13.5px] font-semibold">
             Cancel
           </button>
           <button
@@ -338,6 +366,35 @@ export function SceneComposer({
           </button>
         </div>
       </aside>
+
+      {/* unsaved-changes confirmation */}
+      {confirmExit && (
+        <div className="fixed inset-0 z-[80] grid place-items-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-[340px] bg-white rounded-2xl shadow-2xl p-5">
+            <div className="font-bold text-[15px] text-zinc-900">Discard changes?</div>
+            <p className="mt-1.5 text-[13px] text-zinc-500 leading-relaxed">
+              You have unsaved changes to this scene. If you leave now they will be lost.
+            </p>
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={() => setConfirmExit(false)}
+                className="flex-1 h-10 rounded-xl bg-zinc-900 text-white text-[13px] font-semibold hover:bg-zinc-800 transition"
+              >
+                Keep editing
+              </button>
+              <button
+                onClick={() => {
+                  setConfirmExit(false);
+                  onClose();
+                }}
+                className="flex-1 h-10 rounded-xl border border-zinc-200 text-[13px] font-semibold text-red-600 hover:bg-red-50 transition"
+              >
+                Discard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

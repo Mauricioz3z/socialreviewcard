@@ -913,8 +913,9 @@ export default function App() {
           <div className="h-4" />
         </div>
 
-        {/* sticky export */}
-        <div className="shrink-0 p-4 border-t border-zinc-100 bg-white space-y-2">
+        {/* sticky export — extra bottom padding on mobile clears the browser
+            gesture/navigation bar (safe-area aware). */}
+        <div className="shrink-0 p-4 pb-[max(24px,env(safe-area-inset-bottom))] lg:pb-4 border-t border-zinc-100 bg-white space-y-2">
           {/* primary action — export image */}
           <button
             onClick={doExport}
