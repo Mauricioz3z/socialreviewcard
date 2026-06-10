@@ -102,6 +102,20 @@ export default function Landing() {
     return () => { window.removeEventListener('scroll', onScroll); io.disconnect(); clearTimeout(fallback); };
   }, []);
 
+  // Reveal elements that mount only after async data loads (pricing toggle,
+  // founder band) — the initial observer never saw them.
+  useEffect(() => {
+    const els = document.querySelectorAll('.reveal:not(.in)');
+    if (!els.length) return;
+    const io = new IntersectionObserver(
+      (entries) => entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }),
+      { threshold: 0.12, rootMargin: '0px 0px -8% 0px' },
+    );
+    els.forEach((e) => io.observe(e));
+    const fallback = setTimeout(() => els.forEach((e) => e.classList.add('in')), 500);
+    return () => { io.disconnect(); clearTimeout(fallback); };
+  }, [plans, founder]);
+
   const proFeats = config?.proFeatures && config.proFeatures.length > 0
     ? config.proFeatures
     : ['Animated video exports (MP4) for Reels & TikTok', 'No watermark — 100% your brand', 'Unlimited high-resolution exports', 'Bulk export multiple cards', 'New styles & animations every month', 'Priority support'];
