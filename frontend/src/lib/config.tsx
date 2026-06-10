@@ -54,12 +54,18 @@ export interface RatioConfig {
   dims: string;
   w: number;
   h: number;
+  /** Raster multiplier at export time (story 2.5 → exactly 1080×1920, Instagram-native). */
+  exportScale: number;
 }
 
 export const RATIOS: Record<RatioId, RatioConfig> = {
-  story: { id: 'story', label: 'Story', dims: '9:16', w: 432, h: 768 },
-  square: { id: 'square', label: 'Post', dims: '1:1', w: 600, h: 600 },
+  story: { id: 'story', label: 'Story', dims: '9:16', w: 432, h: 768, exportScale: 2.5 },
+  square: { id: 'square', label: 'Post', dims: '1:1', w: 600, h: 600, exportScale: 2 },
 };
+
+/** Real pixel size of the exported PNG for a ratio (what users should see). */
+export const exportSize = (r: RatioConfig) =>
+  `${Math.round(r.w * r.exportScale)}×${Math.round(r.h * r.exportScale)}`;
 
 export const NOISE =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")";

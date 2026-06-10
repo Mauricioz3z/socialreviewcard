@@ -36,7 +36,7 @@ import { ImportScreenshotModal } from './components/ImportScreenshotModal';
 import { ReelModal } from './feature/reel/ReelModal';
 import { SceneComposer } from './feature/reel/SceneComposer';
 import type { UserScene } from './feature/reel/userScene';
-import { BACKGROUNDS, CARD_STYLES, DEFAULT_PLATFORMS, resolvePlatform, RATIOS } from './lib/config';
+import { BACKGROUNDS, CARD_STYLES, DEFAULT_PLATFORMS, exportSize, resolvePlatform, RATIOS } from './lib/config';
 import { PlatformIcon } from './lib/platformIcon';
 import {
   ApiError,
@@ -444,7 +444,13 @@ export default function App() {
       ]).catch(() => {});
       await document.fonts.ready;
     }
-    return toPng(node, { pixelRatio: 2, cacheBust: true, width: node.offsetWidth, height: node.offsetHeight });
+    // Story exports at 2.5× → exactly 1080×1920 (Instagram-native resolution).
+    return toPng(node, {
+      pixelRatio: RATIOS[ratio].exportScale,
+      cacheBust: true,
+      width: node.offsetWidth,
+      height: node.offsetHeight,
+    });
   };
 
   const renderPng = () => renderNode(captureRef.current);
@@ -653,8 +659,10 @@ export default function App() {
                 upgrading={upgrading}
                 onSignOut={signOut}
                 onMyCards={() => setShowCards(true)}
+                onFeedback={() => setShowFeedback(true)}
                 priceLabel={proPriceLabel}
                 dark={false}
+                compact
               />
             ) : (
               <button
@@ -1000,7 +1008,7 @@ export default function App() {
           </div>
           <div className="text-center text-[11px] text-zinc-400">
             {!session ? (
-              <>Sign in with Google to export · {RATIOS[ratio].w}×{RATIOS[ratio].h}</>
+              <>Sign in with Google to export · {exportSize(RATIOS[ratio])}</>
             ) : usage?.isPro ? (
               <span className="text-accent font-medium">Unlimited exports · Pro</span>
             ) : usage ? (
@@ -1008,10 +1016,10 @@ export default function App() {
                 <span className={usage.remaining === 0 ? 'text-red-500 font-semibold' : 'font-medium text-zinc-500'}>
                   {usage.remaining} of {usage.freeLimit} free exports
                 </span>{' '}
-                · {RATIOS[ratio].w}×{RATIOS[ratio].h}
+                · {exportSize(RATIOS[ratio])}
               </>
             ) : (
-              <>High-resolution PNG · {RATIOS[ratio].w}×{RATIOS[ratio].h}</>
+              <>High-resolution PNG · {exportSize(RATIOS[ratio])}</>
             )}
           </div>
         </div>
@@ -1041,6 +1049,7 @@ export default function App() {
                 upgrading={upgrading}
                 onSignOut={signOut}
                 onMyCards={() => setShowCards(true)}
+                onFeedback={() => setShowFeedback(true)}
                 priceLabel={proPriceLabel}
                 dark
               />
@@ -1135,10 +1144,12 @@ export default function App() {
       )}
 
       {/* ============ FEEDBACK ============ */}
+      {/* Desktop only — on phones it covered the footer actions; mobile users
+          reach it via the account menu instead. */}
       <button
         onClick={() => setShowFeedback(true)}
         title="Send feedback or get support"
-        className="fixed bottom-5 right-5 z-40 flex items-center gap-2 h-11 pl-3.5 pr-4 rounded-full bg-accent text-white shadow-lg hover:bg-accent-hover active:scale-95 transition"
+        className="fixed bottom-5 right-5 z-40 hidden lg:flex items-center gap-2 h-11 pl-3.5 pr-4 rounded-full bg-accent text-white shadow-lg hover:bg-accent-hover active:scale-95 transition"
       >
         <MessageCircle size={18} strokeWidth={2.2} />
         <span className="hidden sm:inline text-[13px] font-semibold">Feedback</span>
@@ -1318,8 +1329,10 @@ function AccountMenu({
   upgrading,
   onSignOut,
   onMyCards,
+  onFeedback,
   priceLabel,
   dark = false,
+  compact = false,
 }: {
   email: string;
   subscription: 'free' | 'pro';
@@ -1327,8 +1340,11 @@ function AccountMenu({
   upgrading: boolean;
   onSignOut: () => void;
   onMyCards: () => void;
+  onFeedback?: () => void;
   priceLabel: string;
   dark?: boolean;
+  /** Avatar-only trigger — used on narrow headers so it never crowds the brand. */
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const initials = email.slice(0, 2).toUpperCase();
@@ -1337,7 +1353,8 @@ function AccountMenu({
       <button
         onClick={() => setOpen((v) => !v)}
         className={
-          'flex items-center gap-2 pl-1 pr-2.5 py-1 rounded-full border transition ' +
+          'flex items-center gap-2 py-1 rounded-full border transition ' +
+          (compact ? 'pl-1 pr-1 ' : 'pl-1 pr-2.5 ') +
           (dark
             ? 'bg-white/5 border-white/10 hover:bg-white/10'
             : 'bg-zinc-50 border-zinc-200 hover:bg-zinc-100')
@@ -1346,14 +1363,16 @@ function AccountMenu({
         <span className="grid place-items-center w-6 h-6 rounded-full bg-accent text-white text-[10px] font-bold">
           {initials}
         </span>
-        <span
-          className={
-            'text-[12px] font-medium max-w-[120px] truncate ' + (dark ? 'text-zinc-200' : 'text-zinc-700')
-          }
-        >
-          {email}
-        </span>
-        {subscription === 'pro' && <Crown size={13} className="text-amber-400" />}
+        {!compact && (
+          <span
+            className={
+              'text-[12px] font-medium max-w-[120px] truncate ' + (dark ? 'text-zinc-200' : 'text-zinc-700')
+            }
+          >
+            {email}
+          </span>
+        )}
+        {subscription === 'pro' && !compact && <Crown size={13} className="text-amber-400" />}
       </button>
 
       {open && (
@@ -1393,6 +1412,17 @@ function AccountMenu({
                   className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-semibold text-accent hover:bg-accent-soft transition text-left disabled:opacity-60"
                 >
                   {upgrading ? <Loader2 size={15} className="animate-spin" /> : <Crown size={15} />} Upgrade to Pro · {priceLabel}
+                </button>
+              )}
+              {onFeedback && (
+                <button
+                  onClick={() => {
+                    setOpen(false);
+                    onFeedback();
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] text-zinc-700 hover:bg-zinc-100 transition text-left"
+                >
+                  <MessageCircle size={15} /> Send feedback
                 </button>
               )}
               <button
