@@ -314,7 +314,7 @@ export function ReelModal({
           {busy && (
             <div>
               <div className="flex items-center justify-between text-[12.5px] text-zinc-500 mb-1.5">
-                <span>{status === 'recording' ? 'Recording…' : 'Encoding MP4…'}</span>
+                <span>{status === 'recording' ? 'Recording…' : 'Finalizing video…'}</span>
                 <span>{Math.round(progress * 100)}%</span>
               </div>
               <div className="h-2 rounded-full bg-zinc-100 overflow-hidden">

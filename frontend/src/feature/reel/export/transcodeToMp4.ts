@@ -18,21 +18,36 @@ async function getFfmpeg(onProgress?: (p: number) => void): Promise<FFmpeg> {
   return ff;
 }
 
-/** Transcodes a (WebM) blob to a widely-compatible H.264 MP4, entirely client-side. */
-export async function webmToMp4(input: Blob, onProgress?: (p: number) => void): Promise<Blob> {
+/**
+ * Normalizes a recorded clip into a widely-compatible MP4 that WhatsApp,
+ * Instagram and iOS accept: progressive (+faststart), H.264 yuv420p, and a
+ * silent AAC audio track (players reject video-only/fragmented MP4s).
+ * Native MP4 input is remuxed (-c:v copy, fast); WebM is re-encoded to H.264.
+ */
+export async function finalizeMp4(
+  input: Blob,
+  isMp4: boolean,
+  onProgress?: (p: number) => void,
+): Promise<Blob> {
   const ff = await getFfmpeg(onProgress);
-  await ff.writeFile('in.webm', await fetchFile(input));
+  const inName = isMp4 ? 'in.mp4' : 'in.webm';
+  await ff.writeFile(inName, await fetchFile(input));
+
+  const videoArgs = isMp4
+    ? ['-c:v', 'copy']
+    : ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p'];
+
   await ff.exec([
-    '-i', 'in.webm',
-    '-c:v', 'libx264',
-    '-preset', 'veryfast',
-    '-crf', '20',
-    '-pix_fmt', 'yuv420p', // required for iOS / Instagram playback
+    '-i', inName,
+    '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
+    '-map', '0:v:0', '-map', '1:a:0',
+    ...videoArgs,
+    '-c:a', 'aac', '-b:a', '128k',
+    '-shortest',
     '-movflags', '+faststart',
     'out.mp4',
   ]);
+
   const data = await ff.readFile('out.mp4');
-  // Copy into a fresh ArrayBuffer-backed view (readFile may return a SharedArrayBuffer view).
-  const bytes = new Uint8Array(data as Uint8Array);
-  return new Blob([bytes], { type: 'video/mp4' });
+  return new Blob([new Uint8Array(data as Uint8Array)], { type: 'video/mp4' });
 }

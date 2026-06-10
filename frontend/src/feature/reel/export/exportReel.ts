@@ -26,16 +26,16 @@ export async function exportReel(opts: ExportReelOpts): Promise<{ url: string; e
     onProgress: opts.onProgress,
   });
 
-  if (isMp4) return { url: URL.createObjectURL(blob), ext: 'mp4' };
-
-  // WebM path → transcode to MP4 for compatibility.
+  // Always finalize through ffmpeg: even native MP4 from MediaRecorder is a
+  // fragmented, audio-less file that WhatsApp/Instagram reject. finalizeMp4
+  // remuxes (or re-encodes WebM) to a faststart H.264 MP4 with silent audio.
   try {
     opts.onPhase?.('transcoding');
-    const { webmToMp4 } = await import('./transcodeToMp4');
-    const mp4 = await webmToMp4(blob, opts.onProgress);
+    const { finalizeMp4 } = await import('./transcodeToMp4');
+    const mp4 = await finalizeMp4(blob, isMp4, opts.onProgress);
     return { url: URL.createObjectURL(mp4), ext: 'mp4' };
   } catch {
-    // Transcode failed/unavailable — hand back the WebM so the user still gets a file.
-    return { url: URL.createObjectURL(blob), ext: 'webm' };
+    // ffmpeg unavailable/failed — hand back the raw recording so there's still a file.
+    return { url: URL.createObjectURL(blob), ext: isMp4 ? 'mp4' : 'webm' };
   }
 }
