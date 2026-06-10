@@ -151,6 +151,29 @@ export function getAssets(): Promise<{ name: string; url: string }[]> {
   return request<{ name: string; url: string }[]>('/api/assets', { method: 'GET' });
 }
 
+export interface PublicBillingPlan {
+  id: number;
+  name: string;
+  priceLabel: string;
+  kind: string; // 'subscription' | 'lifetime'
+  interval: string; // 'month' | 'year' | 'once'
+  featured: boolean;
+}
+
+export function getBillingPlans(): Promise<PublicBillingPlan[]> {
+  return request<PublicBillingPlan[]>('/api/billing/plans', { method: 'GET' });
+}
+
+export interface FounderCount {
+  claimed: number;
+  limit: number | null;
+  available: boolean;
+}
+
+export function getFounderCount(): Promise<FounderCount> {
+  return request<FounderCount>('/api/billing/founder-count', { method: 'GET' });
+}
+
 export type FeedbackType = 'suggestion' | 'criticism' | 'support';
 
 /** Submits an in-app feedback/support message. Token is optional (captured if signed in). */

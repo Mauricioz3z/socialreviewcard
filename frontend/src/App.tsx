@@ -144,6 +144,7 @@ export default function App() {
   } | null>(null);
   const [scene, setScene] = useState<UserScene | null>(null);
   const [composeUrl, setComposeUrl] = useState<string | null>(null);
+  const [pendingCheckout, setPendingCheckout] = useState<number | 'default' | null>(null);
 
   const captureRef = useRef<HTMLDivElement>(null);
   const reelBaseRef = useRef<HTMLDivElement>(null);
@@ -360,21 +361,47 @@ export default function App() {
   };
 
   /* ----------------------------- billing ----------------------------- */
-  const onUpgrade = async () => {
-    if (!session) {
-      setShowAuth(true);
-      return;
-    }
+  const runCheckout = async (planId?: number) => {
     if (upgrading) return;
     setUpgrading(true);
     try {
-      const url = await withAuth(startCheckout);
+      const url = await withAuth((t) => startCheckout(t, planId));
       window.location.href = url;
     } catch {
       showToast('Checkout unavailable', 'Could not start checkout. Try again later.', 'error');
       setUpgrading(false);
     }
   };
+
+  const onUpgrade = () => {
+    if (!session) {
+      setShowAuth(true);
+      return;
+    }
+    void runCheckout();
+  };
+
+  // Honor a ?checkout=<planId> intent coming from the landing pricing CTAs.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const c = params.get('checkout');
+    if (!c) return;
+    const id = Number(c);
+    setPendingCheckout(Number.isFinite(id) && id > 0 ? id : 'default');
+    params.delete('checkout');
+    const qs = params.toString();
+    window.history.replaceState({}, '', window.location.pathname + (qs ? '?' + qs : ''));
+    if (!loadSession()) setShowAuth(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (pendingCheckout === null || !session) return;
+    const planId = pendingCheckout === 'default' ? undefined : pendingCheckout;
+    setPendingCheckout(null);
+    void runCheckout(planId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, pendingCheckout]);
 
   /* ----------------------------- export / share ----------------------------- */
 

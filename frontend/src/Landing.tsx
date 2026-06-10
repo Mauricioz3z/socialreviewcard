@@ -22,7 +22,14 @@ import {
   RATIOS,
   resolvePlatform,
 } from './lib/config';
-import { getConfig, type PublicConfig } from './lib/api';
+import {
+  getBillingPlans,
+  getConfig,
+  getFounderCount,
+  type FounderCount,
+  type PublicBillingPlan,
+  type PublicConfig,
+} from './lib/api';
 import type { CardData } from './types';
 
 /* ----------------------------- demo cards ----------------------------- */
@@ -74,9 +81,14 @@ const CTA = '/app';
 export default function Landing() {
   const [solid, setSolid] = useState(false);
   const [config, setConfig] = useState<PublicConfig | null>(null);
+  const [plans, setPlans] = useState<PublicBillingPlan[]>([]);
+  const [founder, setFounder] = useState<FounderCount | null>(null);
+  const [yearly, setYearly] = useState(false);
 
   useEffect(() => {
     getConfig().then(setConfig).catch(() => {});
+    getBillingPlans().then(setPlans).catch(() => {});
+    getFounderCount().then(setFounder).catch(() => {});
     const onScroll = () => setSolid(window.scrollY > 24);
     window.addEventListener('scroll', onScroll, { passive: true });
 
@@ -90,10 +102,17 @@ export default function Landing() {
     return () => { window.removeEventListener('scroll', onScroll); io.disconnect(); clearTimeout(fallback); };
   }, []);
 
-  const proPrice = config?.proPriceLabel || '$1.99/mo';
   const proFeats = config?.proFeatures && config.proFeatures.length > 0
     ? config.proFeatures
-    : ['Everything in Free', 'Remove the watermark', 'Your brand colors & logo', 'Bulk export multiple cards', 'New styles every month', 'Priority support'];
+    : ['Animated video exports (MP4) for Reels & TikTok', 'No watermark — 100% your brand', 'Unlimited high-resolution exports', 'Bulk export multiple cards', 'New styles & animations every month', 'Priority support'];
+
+  const subs = plans.filter((p) => p.kind === 'subscription');
+  const monthly = subs.find((p) => p.interval === 'month') ?? subs[0];
+  const annual = subs.find((p) => p.interval === 'year');
+  const lifetime = plans.find((p) => p.kind === 'lifetime');
+  const activePro = yearly && annual ? annual : monthly;
+  const proPrice = activePro?.priceLabel || config?.proPriceLabel || '$1.99/mo';
+  const proHref = (id?: number) => (id != null ? `${CTA}?checkout=${id}` : CTA);
 
   const navLinks: [string, string][] = [['How it works', '#how'], ['Styles', '#styles'], ['Features', '#features'], ['Pricing', '#pricing']];
 
@@ -292,10 +311,30 @@ export default function Landing() {
 
         {/* ---- Pricing ---- */}
         <section id="pricing" className="mx-auto max-w-[1080px] px-6 py-24 lg:py-32">
-          <div className="reveal text-center max-w-xl mx-auto mb-14">
+          <div className="reveal text-center max-w-2xl mx-auto mb-10">
             <SectionLabel>Pricing</SectionLabel>
-            <h2 className="font-serif leading-[1.03] tracking-[-0.02em] mt-4" style={{ fontSize: 'clamp(32px, 4.4vw, 52px)', fontWeight: 500 }}>Start free. Upgrade when you’re ready.</h2>
+            <h2 className="font-serif leading-[1.03] tracking-[-0.02em] mt-4" style={{ fontSize: 'clamp(32px, 4.4vw, 52px)', fontWeight: 500 }}>Start free. Upgrade when your reviews deserve motion.</h2>
+            <p className="mt-4 text-[16px] text-ink-soft">Every plan includes all 4 styles and backgrounds. Pro removes the badge and turns your cards into animated videos.</p>
           </div>
+
+          {/* monthly / yearly toggle */}
+          {annual && (
+            <div className="reveal flex items-center justify-center gap-2 mb-10">
+              <div className="inline-flex items-center rounded-full border border-line bg-white p-1">
+                {([['Monthly', false], ['Yearly', true]] as [string, boolean][]).map(([l, v]) => (
+                  <button
+                    key={l}
+                    onClick={() => setYearly(v)}
+                    className={'px-4 h-9 rounded-full text-[13.5px] font-semibold transition ' + (yearly === v ? 'bg-ink text-cream' : 'text-ink-soft hover:text-ink')}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
+              {yearly && <span className="text-[12.5px] font-semibold text-emerald-600">2 months free</span>}
+            </div>
+          )}
+
           <div className="grid md:grid-cols-2 gap-6 items-stretch">
             {/* Free */}
             <div className="reveal relative rounded-[28px] p-9 flex flex-col bg-white border border-line">
@@ -305,7 +344,7 @@ export default function Landing() {
                 <span className="text-[15px] mb-2 text-ink-soft">forever</span>
               </div>
               <ul className="mt-8 space-y-3.5 flex-1">
-                {['Unlimited review cards', 'All 4 card styles', '5 backgrounds + grain', 'Stories & Posts export', 'Subtle watermark'].map((f) => (
+                {['10 image exports / month', 'All 4 card styles', '5 backgrounds + film grain', 'Stories (9:16) & Posts (1:1)', 'Discreet “Made with” badge'].map((f) => (
                   <li key={f} className="flex items-start gap-3">
                     <span className="grid place-items-center w-5 h-5 rounded-full mt-0.5 shrink-0 bg-emerald-50 text-emerald-600"><Check size={13} strokeWidth={3} /></span>
                     <span className="text-[15px] text-ink">{f}</span>
@@ -329,9 +368,33 @@ export default function Landing() {
                   </li>
                 ))}
               </ul>
-              <a href={CTA} className="mt-9 inline-flex items-center justify-center gap-2 rounded-full h-[52px] text-[15.5px] font-semibold transition-all active:scale-[.98] bg-cream text-ink hover:gap-3">Go Pro <ArrowRight size={17} strokeWidth={2.4} /></a>
+              <a href={proHref(activePro?.id)} className="mt-9 inline-flex items-center justify-center gap-2 rounded-full h-[52px] text-[15.5px] font-semibold transition-all active:scale-[.98] bg-cream text-ink hover:gap-3">Go Pro <ArrowRight size={17} strokeWidth={2.4} /></a>
+              <p className="mt-3 text-center text-[12.5px] text-cream/55">Cancel anytime. No questions asked.</p>
             </div>
           </div>
+
+          {/* Founder's Deal band */}
+          {lifetime && (
+            <div className="reveal mt-6 rounded-[28px] p-7 lg:p-8 flex flex-col md:flex-row md:items-center gap-5 justify-between" style={{ background: 'linear-gradient(120deg,#ffdca8,#ff9aa2,#c8a2e0)' }}>
+              <div className="text-ink">
+                <div className="font-ui font-bold text-[12px] uppercase tracking-wider mb-1">🚀 Founder's Deal</div>
+                <div className="font-serif text-[24px] leading-tight" style={{ fontWeight: 500 }}>Lifetime Pro for {lifetime.priceLabel}, one time.</div>
+                <div className="mt-1 text-[14px] text-ink/80">
+                  Lock in every Pro feature — including everything we ship next — forever.
+                  {founder && founder.limit != null && (
+                    <span className="font-semibold"> {founder.claimed}/{founder.limit} claimed.</span>
+                  )}
+                </div>
+              </div>
+              {founder && !founder.available ? (
+                <span className="shrink-0 inline-flex items-center justify-center rounded-full bg-ink/20 text-ink px-6 h-[52px] text-[15px] font-semibold">Sold out</span>
+              ) : (
+                <a href={proHref(lifetime.id)} className="shrink-0 inline-flex items-center justify-center gap-2 rounded-full bg-ink text-cream px-7 h-[52px] text-[15px] font-semibold hover:gap-3 transition-all active:scale-[.98]">
+                  Claim lifetime access <ArrowRight size={17} strokeWidth={2.4} />
+                </a>
+              )}
+            </div>
+          )}
         </section>
 
         {/* ---- Final CTA ---- */}
