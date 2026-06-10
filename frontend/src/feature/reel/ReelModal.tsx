@@ -308,9 +308,19 @@ export function ReelModal({
           {onCustomize && !result && !busy && (
             <button
               onClick={onCustomize}
-              className="mb-5 w-full inline-flex items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/60 h-10 text-[12.5px] font-semibold text-zinc-600 transition hover:border-accent hover:text-accent hover:bg-accent-soft"
+              className="mb-5 w-full flex items-center gap-3 rounded-xl border border-accent/40 bg-accent-soft px-4 py-3 text-left transition hover:border-accent active:scale-[0.99]"
             >
-              <Sparkle size={14} strokeWidth={2.2} /> {scene ? 'Edit your scene' : 'Customize scene'} — decorations, colors & timing
+              <span className="grid place-items-center w-9 h-9 rounded-lg bg-accent text-white shrink-0">
+                <Sparkle size={16} strokeWidth={2.2} />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[13.5px] font-bold text-accent leading-tight">
+                  {scene ? 'Edit your scene' : 'Customize scene'}
+                </span>
+                <span className="block text-[11.5px] text-zinc-500 mt-0.5">
+                  Decorations, colors & timing
+                </span>
+              </span>
             </button>
           )}
 
