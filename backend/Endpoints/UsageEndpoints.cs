@@ -13,8 +13,12 @@ namespace SocialReviewCard.Endpoints;
 /// </summary>
 public static class UsageEndpoints
 {
-    /// <summary>Fallback monthly cap used only if the settings row is missing.</summary>
-    public const int DefaultFreeExportLimit = 10;
+    /// <summary>
+    /// Fallback monthly cap used only if the settings row is missing.
+    /// Must mirror the <see cref="PlatformSettings.FreeExportLimit"/> seed so the
+    /// marketed quota never diverges from the enforced one.
+    /// </summary>
+    public const int DefaultFreeExportLimit = 3;
 
     public static RouteGroupBuilder MapUsageEndpoints(this IEndpointRouteBuilder routes)
     {

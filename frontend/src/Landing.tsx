@@ -118,7 +118,11 @@ export default function Landing() {
 
   const proFeats = config?.proFeatures && config.proFeatures.length > 0
     ? config.proFeatures
-    : ['Animated video exports (MP4) for Reels & TikTok', 'No watermark — 100% your brand', 'Unlimited high-resolution exports', 'Bulk export multiple cards', 'New styles & animations every month', 'Priority support'];
+    : ['Animated video exports (MP4) for Reels & TikTok', 'No watermark — 100% your brand', 'Unlimited high-resolution exports', 'New styles & animations every month', 'Priority support'];
+
+  // Free-quota copy mirrors the admin-configured limit (3 = backend seed,
+  // shown only until /api/config loads or in the prerendered HTML).
+  const freeLimit = config?.freeExportLimit ?? 3;
 
   const subs = plans.filter((p) => p.kind === 'subscription');
   const monthly = subs.find((p) => p.interval === 'month') ?? subs[0];
@@ -360,7 +364,7 @@ export default function Landing() {
                 <span className="text-[15px] mb-2 text-ink-soft">forever</span>
               </div>
               <ul className="mt-8 space-y-3.5 flex-1">
-                {['10 image exports / month', 'All 4 card styles', '5 backgrounds + film grain', 'Stories (9:16) & Posts (1:1)', 'Discreet “Made with” badge'].map((f) => (
+                {[`${freeLimit} image exports / month`, 'All 4 card styles', '5 backgrounds + film grain', 'Stories (9:16) & Posts (1:1)', 'Discreet “Made with” badge'].map((f) => (
                   <li key={f} className="flex items-start gap-3">
                     <span className="grid place-items-center w-5 h-5 rounded-full mt-0.5 shrink-0 bg-emerald-50 text-emerald-600"><Check size={13} strokeWidth={3} /></span>
                     <span className="text-[15px] text-ink">{f}</span>

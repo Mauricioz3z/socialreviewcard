@@ -14,9 +14,12 @@ declare global {
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 
 export function AuthModal({
+  freeLimit,
   onClose,
   onAuthed,
 }: {
+  /** Admin-configured monthly free-export allowance, shown in the pitch line. */
+  freeLimit: number;
   onClose: () => void;
   onAuthed: (session: AuthSession) => void;
 }) {
@@ -107,7 +110,7 @@ export function AuthModal({
         <div className="px-5 py-7 flex flex-col items-center">
           <p className="text-[13px] text-zinc-500 text-center mb-5 max-w-[280px]">
             Use your Google account to get started. You get{' '}
-            <span className="font-semibold text-zinc-700">3 free exports</span>.
+            <span className="font-semibold text-zinc-700">{freeLimit} free exports per month</span>.
           </p>
 
           {/* Google renders its official button into this node. */}

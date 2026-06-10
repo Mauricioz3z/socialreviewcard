@@ -167,6 +167,10 @@ export default function App() {
   const featuredPlan = plans.find((p) => p.featured) ?? plans[0];
   const proPriceLabel = featuredPlan?.priceLabel || config?.proPriceLabel || '$1.99/mo';
 
+  // Free-quota copy — single source of truth is the admin-configured limit
+  // (the 3 matches the backend seed, used only until /api/config loads).
+  const freeLimit = usage?.freeLimit ?? config?.freeExportLimit ?? 3;
+
   // Platforms come from the admin-managed config, falling back to built-ins
   // until /api/config loads. Unknown/typed labels resolve to a "Custom" source.
   const platforms: PlatformDisplay[] =
@@ -456,7 +460,7 @@ export default function App() {
     if (exporting) return;
     if (!session) {
       setShowAuth(true);
-      showToast('Sign in to export', 'Use your Google account — you get 3 free exports.', 'error');
+      showToast('Sign in to export', `Use your Google account — you get ${freeLimit} free exports per month.`, 'error');
       return;
     }
     if (outOfQuota()) {
@@ -495,7 +499,7 @@ export default function App() {
     if (sharing) return;
     if (!session) {
       setShowAuth(true);
-      showToast('Sign in to share', 'Use your Google account — you get 3 free exports.', 'error');
+      showToast('Sign in to share', `Use your Google account — you get ${freeLimit} free exports per month.`, 'error');
       return;
     }
     if (outOfQuota()) {
@@ -1069,7 +1073,7 @@ export default function App() {
       )}
 
       {/* ============ AUTH MODAL ============ */}
-      {showAuth && <AuthModal onClose={() => setShowAuth(false)} onAuthed={onAuthed} />}
+      {showAuth && <AuthModal freeLimit={freeLimit} onClose={() => setShowAuth(false)} onAuthed={onAuthed} />}
 
       {/* ============ MOBILE PREVIEW MODAL ============ */}
       {showMobilePreview && (
