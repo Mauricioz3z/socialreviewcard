@@ -42,6 +42,7 @@ import {
   deleteCard,
   getCards,
   getConfig,
+  getBillingPlans,
   getUsage,
   loadSession,
   refresh,
@@ -50,6 +51,7 @@ import {
   startCheckout,
   submitFeedback,
   type FeedbackType,
+  type PublicBillingPlan,
   type PublicConfig,
   type UsageInfo,
 } from './lib/api';
@@ -134,6 +136,7 @@ export default function App() {
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [usage, setUsage] = useState<UsageInfo | null>(null);
   const [config, setConfig] = useState<PublicConfig | null>(null);
+  const [plans, setPlans] = useState<PublicBillingPlan[]>([]);
   const [showMobilePreview, setShowMobilePreview] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [reelLayers, setReelLayers] = useState<{
@@ -159,6 +162,10 @@ export default function App() {
   // Free-plan exports get a watermark; Pro accounts never do.
   const watermark =
     config?.watermarkEnabled && !usage?.isPro ? config.watermarkText : null;
+
+  // Pro price label — single source of truth is the featured billing plan.
+  const featuredPlan = plans.find((p) => p.featured) ?? plans[0];
+  const proPriceLabel = featuredPlan?.priceLabel || config?.proPriceLabel || '$1.99/mo';
 
   // Platforms come from the admin-managed config, falling back to built-ins
   // until /api/config loads. Unknown/typed labels resolve to a "Custom" source.
@@ -200,6 +207,11 @@ export default function App() {
       .catch(() => {
         /* config is best-effort; the app works with built-in defaults */
       });
+    getBillingPlans()
+      .then((p) => {
+        if (!cancelled) setPlans(p);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -605,7 +617,7 @@ export default function App() {
                 upgrading={upgrading}
                 onSignOut={signOut}
                 onMyCards={() => setShowCards(true)}
-                priceLabel={config?.proPriceLabel || '$1.99/mo'}
+                priceLabel={proPriceLabel}
                 dark={false}
               />
             ) : (
@@ -973,7 +985,7 @@ export default function App() {
                 upgrading={upgrading}
                 onSignOut={signOut}
                 onMyCards={() => setShowCards(true)}
-                priceLabel={config?.proPriceLabel || '$1.99/mo'}
+                priceLabel={proPriceLabel}
                 dark
               />
             ) : (
@@ -1031,6 +1043,7 @@ export default function App() {
           onUpgrade={onUpgrade}
           upgrading={upgrading}
           config={config}
+          priceLabel={proPriceLabel}
         />
       )}
 
@@ -1154,15 +1167,16 @@ function UpgradeModal({
   onUpgrade,
   upgrading,
   config,
+  priceLabel,
 }: {
   onClose: () => void;
   onUpgrade: () => void;
   upgrading: boolean;
   config: PublicConfig | null;
+  priceLabel: string;
 }) {
   const title = config?.upgradeTitle || "You're out of free exports";
   const subtitle = config?.upgradeSubtitle || 'Upgrade to SocialReviewCard Pro to keep exporting';
-  const priceLabel = config?.proPriceLabel || '$1.99/mo';
   const perks =
     config?.proFeatures && config.proFeatures.length > 0
       ? config.proFeatures
