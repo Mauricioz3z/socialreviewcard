@@ -129,7 +129,7 @@ export default function Landing() {
   const annual = subs.find((p) => p.interval === 'year');
   const lifetime = plans.find((p) => p.kind === 'lifetime');
   const activePro = yearly && annual ? annual : monthly;
-  const proPrice = activePro?.priceLabel || config?.proPriceLabel || '$1.99/mo';
+  const proPrice = activePro?.priceLabel || config?.proPriceLabel || '$7/mo';
   const proHref = (id?: number) => (id != null ? `${CTA}?checkout=${id}` : CTA);
 
   const navLinks: [string, string][] = [['How it works', '#how'], ['Styles', '#styles'], ['Features', '#features'], ['Pricing', '#pricing']];

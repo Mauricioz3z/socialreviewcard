@@ -18,8 +18,8 @@ public class PlatformSettings
     /// <summary>Lifetime free export allowance for non-Pro accounts.</summary>
     public int FreeExportLimit { get; set; } = 3;
 
-    /// <summary>Display label for the Pro price (e.g. "$1.99/mo"). Cosmetic only.</summary>
-    public string ProPriceLabel { get; set; } = "$1.99/mo";
+    /// <summary>Display label for the Pro price (e.g. "$7/mo"). Cosmetic only.</summary>
+    public string ProPriceLabel { get; set; } = "$7/mo";
 
     /// <summary>JSON array of Pro perk strings shown in the upgrade popup.</summary>
     public string ProFeaturesJson { get; set; } =

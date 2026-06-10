@@ -9,7 +9,7 @@ public class StripeOptions
     public string PublishableKey { get; set; } = string.Empty;
     public string WebhookSecret { get; set; } = string.Empty;
 
-    /// <summary>The recurring price id ($1.99/month) configured in the Stripe dashboard.</summary>
+    /// <summary>Fallback recurring price id from the Stripe dashboard (DB billing plans take precedence).</summary>
     public string PriceId { get; set; } = string.Empty;
 
     public string SuccessUrl { get; set; } = string.Empty;

@@ -170,7 +170,7 @@ export default function App() {
 
   // Pro price label — single source of truth is the featured billing plan.
   const featuredPlan = plans.find((p) => p.featured) ?? plans[0];
-  const proPriceLabel = featuredPlan?.priceLabel || config?.proPriceLabel || '$1.99/mo';
+  const proPriceLabel = featuredPlan?.priceLabel || config?.proPriceLabel || '$7/mo';
 
   // Free-quota copy — single source of truth is the admin-configured limit
   // (the 3 matches the backend seed, used only until /api/config loads).

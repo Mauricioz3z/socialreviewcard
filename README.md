@@ -26,7 +26,7 @@ React 18 + Vite + TypeScript + Tailwind recreation of the ReviewCraft studio:
 - **Export** rasterizes the full-resolution card with `html2canvas` and downloads a PNG.
 - **Auth** (sign in / register) against the backend Identity API.
 - **Save to cloud** persists the card config; **My saved cards** lists/loads/deletes them.
-- **Upgrade to Pro** ($1.99/mo) starts a Stripe Checkout session.
+- **Upgrade to Pro** ($7/mo — price/label managed via DB billing plans) starts a Stripe Checkout session.
 
 ```bash
 cd frontend
@@ -65,7 +65,7 @@ dotnet run        # http://localhost:5080
 | `Cors:AllowedOrigins` | Allowed frontend origins |
 | `Stripe:SecretKey` | Stripe secret key (`sk_...`) |
 | `Stripe:WebhookSecret` | Webhook signing secret (`whsec_...`) |
-| `Stripe:PriceId` | Recurring price id for the $1.99/mo plan |
+| `Stripe:PriceId` | Fallback recurring price id (DB billing plans take precedence) |
 | `Stripe:SuccessUrl` / `CancelUrl` | Post-checkout redirect URLs |
 | `Anthropic:ApiKey` | Anthropic API key (`sk-ant-...`) for screenshot import; empty disables the feature |
 | `Anthropic:Model` | Vision model for review extraction (default `claude-haiku-4-5-20251001`) |
