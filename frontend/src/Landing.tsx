@@ -128,6 +128,19 @@ export default function Landing() {
   const monthly = subs.find((p) => p.interval === 'month') ?? subs[0];
   const annual = subs.find((p) => p.interval === 'year');
   const lifetime = plans.find((p) => p.kind === 'lifetime');
+
+  // Yearly-savings badge computed from the real admin-managed prices, so it
+  // never drifts when prices change (it used to hardcode "Save 2 months").
+  const moneyOf = (label?: string) => {
+    const m = label?.match(/[\d]+(?:\.[\d]+)?/);
+    return m ? parseFloat(m[0]) : null;
+  };
+  const monthlyCost = moneyOf(monthly?.priceLabel);
+  const annualCost = moneyOf(annual?.priceLabel);
+  const yearlySavingsPct =
+    monthlyCost && annualCost && annualCost < monthlyCost * 12
+      ? Math.round((1 - annualCost / (monthlyCost * 12)) * 100)
+      : null;
   const activePro = yearly && annual ? annual : monthly;
   const proPrice = activePro?.priceLabel || config?.proPriceLabel || '$7/mo';
   const proHref = (id?: number) => (id != null ? `${CTA}?checkout=${id}` : CTA);
@@ -364,9 +377,11 @@ export default function Landing() {
                   </button>
                 ))}
               </div>
-              <span className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 px-3.5 py-1.5 text-[12.5px] font-bold ring-1 ring-emerald-200">
-                Save 2 months
-              </span>
+              {yearlySavingsPct != null && (
+                <span className="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 px-3.5 py-1.5 text-[12.5px] font-bold ring-1 ring-emerald-200">
+                  Save {yearlySavingsPct}%
+                </span>
+              )}
             </div>
           )}
 
